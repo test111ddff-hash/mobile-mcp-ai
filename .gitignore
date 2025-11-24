@@ -1,0 +1,84 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# 构建和发布文件（不要提交）
+*.egg-info/
+dist/
+build/
+*.whl
+*.tar.gz
+
+# PyPI配置（包含敏感信息，不要提交）
+.pypirc
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 测试结果和截图（用户本地生成的文件）
+screenshots/*.png
+screenshots/*.jpg
+screenshots/requests/*.json
+screenshots/results/*.json
+!screenshots/.gitkeep
+!screenshots/requests/.gitkeep
+!screenshots/results/.gitkeep
+
+# Allure 测试结果
+allure-results/
+allure-report/
+
+# 工作区文件（个人配置）
+*.code-workspace
+workspace/
+
+# 生成的测试文件
+examples/generated_test.py
+examples/test_*_generated.py
+
+# 日志文件
+*.log
+
+# 临时文件
+*.tmp
+*.bak
+
+# 个人测试文件（用户自己写的测试用例，不需要提交）
+# 如果需要保留示例测试文件，可以注释掉下面两行
+examples/test_*.py
+tests/test_*.py
+
+# 开发文档（内部文档，不需要提交）
+docs/SUMMARY.md
+docs/FINAL_SUMMARY.md
+docs/COMBINED_ARCHITECTURE.md
+docs/md/
+GIT_AND_PUBLISH.md
+CURSOR_SETUP.md
+TESTING_GUIDE.md
+
+# 保留用户使用文档（这些应该提交）
+# docs/INSTALL_AND_USE.md ✅ 提交
+# docs/QUICK_START.md ✅ 提交
+# docs/FAQ.md ✅ 提交
+# docs/IOS_SETUP.md ✅ 提交
+# docs/PACKAGE_PUBLISH.md ✅ 提交（发布指南）
+# docs/PUBLISH_AND_USAGE.md ✅ 提交（使用指南）
+
