@@ -1,34 +1,55 @@
-# 🚀 Mobile MCP AI - 让 AI 帮你写移动端测试代码
+<div align="center">
+
+# 🚀 Mobile MCP AI
+
+### 让 AI 帮你写移动端测试代码
 
 > **🤖 用自然语言描述测试流程，AI 自动执行并生成 pytest 测试用例！**
 
+[![PyPI version](https://img.shields.io/pypi/v/mobile-mcp-ai.svg)](https://pypi.org/project/mobile-mcp-ai/)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
+
+[📖 文档](#-详细文档) • [🚀 快速开始](#-5-分钟快速开始) • [💡 使用技巧](#-使用技巧) • [🤝 贡献](#-贡献)
+
+---
+
+</div>
+
 ## ✨ 核心亮点
 
+<div align="center">
+
 ### 🎯 **零代码编写，自然语言测试**
-- 在 Cursor 中直接用自然语言描述测试流程
-- AI 自动理解并执行每一步操作
-- **执行完成后，一键生成 pytest 格式的测试脚本**
+在 Cursor 中直接用自然语言描述测试流程，AI 自动理解并执行每一步操作  
+**执行完成后，一键生成 pytest 格式的测试脚本** ⭐
 
 ### 🧠 **智能定位，自动重试**
-- 找不到元素？AI 自动截图分析
-- 定位失败？自动尝试多种定位策略
-- 操作失败？AI 智能重试并调整策略
+找不到元素？AI 自动截图分析  
+定位失败？自动尝试多种定位策略  
+操作失败？AI 智能重试并调整策略
 
 ### 📝 **操作即代码，自动生成测试用例**
-- 执行完测试流程后，AI 自动生成 pytest 测试脚本
-- 使用已验证的定位方式（坐标、bounds 等）
-- **生成的脚本 100% 可执行，支持 pytest 批量运行和 Allure 报告**
+执行完测试流程后，AI 自动生成 pytest 测试脚本  
+使用已验证的定位方式（坐标、bounds 等）  
+**生成的脚本 100% 可执行，支持 pytest 批量运行和 Allure 报告**
+
+</div>
 
 ---
 
 ## 🎉 已发布到 PyPI！
 
+<div align="center">
+
 ```bash
 pip install mobile-mcp-ai
 ```
 
-**PyPI 页面**：https://pypi.org/project/mobile-mcp-ai/  
-**GitHub 仓库**：https://github.com/test111ddff-hash/mobile-mcp-ai
+**📦 PyPI**: [mobile-mcp-ai](https://pypi.org/project/mobile-mcp-ai/)  
+**🐙 GitHub**: [test111ddff-hash/mobile-mcp-ai](https://github.com/test111ddff-hash/mobile-mcp-ai)
+
+</div>
 
 ---
 
@@ -44,6 +65,9 @@ pip install mobile-mcp-ai
 
 创建 `.cursor/mcp.json`（项目根目录或用户目录 `~/.cursor/mcp.json`）：
 
+<details>
+<summary>📋 点击查看配置示例</summary>
+
 ```json
 {
   "mcpServers": {
@@ -57,6 +81,8 @@ pip install mobile-mcp-ai
   }
 }
 ```
+
+</details>
 
 ### 3️⃣ 连接 Android 设备
 
@@ -79,7 +105,11 @@ adb devices  # 确认设备可见
 6. 验证页面是否显示"欢迎"
 ```
 
-**AI 会自动执行每一步操作！** ✨
+<div align="center">
+
+**✨ AI 会自动执行每一步操作！**
+
+</div>
 
 ---
 
@@ -87,7 +117,12 @@ adb devices  # 确认设备可见
 
 ### 📱 场景 1：自然语言执行测试
 
-**你说：**
+<div align="center">
+
+**💬 你说：**
+
+</div>
+
 ```
 帮我测试发帖功能：
 1. 启动 com.im30.way
@@ -99,26 +134,44 @@ adb devices  # 确认设备可见
 7. 验证页面出现FAQ
 ```
 
-**AI 自动：**
-- ✅ 启动应用
-- ✅ 智能定位并点击每个元素
-- ✅ 自动处理弹窗、等待页面加载
-- ✅ 验证操作结果
+<div align="center">
 
-### 📝 场景 2：执行后自动生成 pytest 用例
+**🤖 AI 自动：**
 
-**执行完测试后，你说：**
+✅ 启动应用  
+✅ 智能定位并点击每个元素  
+✅ 自动处理弹窗、等待页面加载  
+✅ 验证操作结果
+
+</div>
+
+---
+
+### 📝 场景 2：执行后自动生成 pytest 用例 ⭐
+
+<div align="center">
+
+**💬 执行完测试后，你说：**
+
+</div>
+
 ```
 帮我生成 pytest 测试脚本，测试名称是"建议发帖测试"，包名是 com.im30.way，文件名是 test_建议发帖
 ```
 
-**AI 自动：**
-- ✅ 分析刚才执行的所有操作
-- ✅ 提取已验证的定位方式（坐标、bounds、resource-id 等）
-- ✅ 生成标准的 pytest 格式测试脚本
-- ✅ 脚本保存在 `tests/` 目录，可直接运行
+<div align="center">
 
-**生成的脚本示例：**
+**🤖 AI 自动：**
+
+✅ 分析刚才执行的所有操作  
+✅ 提取已验证的定位方式（坐标、bounds、resource-id 等）  
+✅ 生成标准的 pytest 格式测试脚本  
+✅ 脚本保存在 `tests/` 目录，可直接运行
+
+</div>
+
+**📄 生成的脚本示例：**
+
 ```python
 import pytest
 import asyncio
@@ -142,7 +195,8 @@ async def test_建议发帖(mobile_client):
     # ...
 ```
 
-**运行生成的测试：**
+**▶️ 运行生成的测试：**
+
 ```bash
 # 运行单个测试
 pytest tests/test_建议发帖.py -v
@@ -152,57 +206,73 @@ pytest tests/test_建议发帖.py --alluredir=./allure-results
 allure serve ./allure-results
 ```
 
+---
+
 ### 🧠 场景 3：智能调试和重试
 
-**你说：**
+<div align="center">
+
+**💬 你说：**
+
+</div>
+
 ```
 为什么点击"云文档"失败了？
 ```
 
-**AI 自动：**
+<div align="center">
+
+**🤖 AI 自动：**
+
 1. 📸 调用 `mobile_snapshot` 查看当前页面结构
 2. 🔍 分析为什么找不到"云文档"元素
 3. 💡 发现可能是弹窗场景，建议使用视觉识别
 4. 🎯 自动调用视觉识别并重新定位
 5. ✅ 成功点击并继续执行
 
+</div>
+
 ---
 
 ## 🎨 完整工作流程
 
+<div align="center">
+
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  1. 在 Cursor 中用自然语言描述测试流程                  │
+│  1️⃣ 在 Cursor 中用自然语言描述测试流程                  │
 └─────────────────┬───────────────────────────────────────┘
                    │
                    ▼
 ┌─────────────────────────────────────────────────────────┐
-│  2. AI 自动执行每一步操作                               │
-│     - 智能定位元素（规则匹配、XML分析、视觉识别）        │
-│     - 自动处理弹窗、等待页面加载                        │
-│     - 失败时自动重试和调整策略                          │
+│  2️⃣ AI 自动执行每一步操作                               │
+│     • 智能定位元素（规则匹配、XML分析、视觉识别）        │
+│     • 自动处理弹窗、等待页面加载                        │
+│     • 失败时自动重试和调整策略                          │
 └─────────────────┬───────────────────────────────────────┘
                    │
                    ▼
 ┌─────────────────────────────────────────────────────────┐
-│  3. 执行完成后，AI 自动生成 pytest 测试脚本            │
-│     - 使用已验证的定位方式（坐标、bounds等）            │
-│     - 100% 可执行的 pytest 格式                        │
-│     - 支持批量运行和 Allure 报告                        │
+│  3️⃣ 执行完成后，AI 自动生成 pytest 测试脚本            │
+│     • 使用已验证的定位方式（坐标、bounds等）            │
+│     • 100% 可执行的 pytest 格式                        │
+│     • 支持批量运行和 Allure 报告                        │
 └─────────────────┬───────────────────────────────────────┘
                    │
                    ▼
 ┌─────────────────────────────────────────────────────────┐
-│  4. 直接运行生成的测试脚本                              │
+│  4️⃣ 直接运行生成的测试脚本                              │
 │     pytest tests/test_xxx.py -v                         │
 └─────────────────────────────────────────────────────────┘
 ```
+
+</div>
 
 ---
 
 ## 🛠️ 可用的 MCP 工具
 
-配置完成后，Cursor AI 可以使用以下 23 个工具：
+配置完成后，Cursor AI 可以使用以下 **23 个工具**：
 
 ### 📱 设备管理
 - `mobile_list_devices` - 列出所有连接的设备
@@ -241,15 +311,17 @@ allure serve ./allure-results
 
 ## 💡 使用技巧
 
-### 技巧 1：生成测试脚本的最佳时机
+### 💡 技巧 1：生成测试脚本的最佳时机
 
 **推荐流程：**
-1. 先用自然语言执行一遍完整的测试流程
-2. 确保所有操作都成功执行
-3. 然后让 AI 生成 pytest 脚本
+
+1. ✅ 先用自然语言执行一遍完整的测试流程
+2. ✅ 确保所有操作都成功执行
+3. ✅ 然后让 AI 生成 pytest 脚本
 
 **示例：**
-```
+
+```markdown
 # 第一步：执行测试
 帮我测试登录功能：
 1. 启动 com.example.app
@@ -260,22 +332,25 @@ allure serve ./allure-results
 帮我生成 pytest 测试脚本，测试名称是"登录测试"，包名是 com.example.app，文件名是 test_登录
 ```
 
-### 技巧 2：智能定位失败时的处理
+### 💡 技巧 2：智能定位失败时的处理
 
 如果 AI 找不到元素，会自动：
+
 1. 📸 截图并创建分析请求
 2. 🧠 调用 Cursor AI 视觉识别
 3. 📍 获取坐标并点击
 4. ✅ 继续执行后续步骤
 
 你也可以手动触发：
+
 ```
 帮我分析截图，找到"设置按钮"的位置
 ```
 
-### 技巧 3：批量生成测试脚本
+### 💡 技巧 3：批量生成测试脚本
 
 执行多个测试流程后，可以批量生成：
+
 ```
 帮我生成 pytest 测试脚本：
 - 测试名称：登录测试，包名：com.example.app，文件名：test_登录
@@ -286,53 +361,65 @@ allure serve ./allure-results
 
 ## 📚 详细文档
 
-- **[📘 安装和使用指南](docs/INSTALL_AND_USE.md)** - 完整的安装和配置说明
-- **[🚀 快速开始](docs/QUICK_START.md)** - 5分钟快速上手
-- **[❓ 常见问题](docs/FAQ.md)** - FAQ 和故障排除
-- **[🍎 iOS 设置](docs/IOS_SETUP.md)** - iOS 设备配置指南
-- **[📦 发布指南](docs/PACKAGE_PUBLISH.md)** - 如何发布到 PyPI
+<div align="center">
+
+| 📖 文档 | 📝 说明 |
+|--------|--------|
+| [📘 安装和使用指南](docs/INSTALL_AND_USE.md) | 完整的安装和配置说明 |
+| [🚀 快速开始](docs/QUICK_START.md) | 5分钟快速上手 |
+| [❓ 常见问题](docs/FAQ.md) | FAQ 和故障排除 |
+| [🍎 iOS 设置](docs/IOS_SETUP.md) | iOS 设备配置指南 |
+| [📦 发布指南](docs/PACKAGE_PUBLISH.md) | 如何发布到 PyPI |
+
+</div>
 
 ---
 
 ## 🎯 为什么选择 Mobile MCP AI？
 
+<div align="center">
+
 | 特性 | 传统方式 | Mobile MCP AI |
-|------|---------|---------------|
-| **编写测试** | 需要写代码 | 自然语言描述 ✨ |
-| **定位元素** | 手动写定位器 | AI 智能定位 ✨ |
-| **调试失败** | 手动分析日志 | AI 自动分析 ✨ |
-| **生成脚本** | 手动编写 | AI 自动生成 ✨ |
-| **代码复用** | 需要手动提取 | 自动生成 pytest ✨ |
-| **学习曲线** | 需要学习 API | 自然语言即可 ✨ |
+|:----:|:--------:|:-------------:|
+| **编写测试** | ❌ 需要写代码 | ✅ 自然语言描述 ✨ |
+| **定位元素** | ❌ 手动写定位器 | ✅ AI 智能定位 ✨ |
+| **调试失败** | ❌ 手动分析日志 | ✅ AI 自动分析 ✨ |
+| **生成脚本** | ❌ 手动编写 | ✅ AI 自动生成 ✨ |
+| **代码复用** | ❌ 需要手动提取 | ✅ 自动生成 pytest ✨ |
+| **学习曲线** | ❌ 需要学习 API | ✅ 自然语言即可 ✨ |
+
+</div>
 
 ---
 
 ## 🌟 核心优势
 
-### 1. **零代码编写**
-- 不需要学习任何 API
-- 直接用自然语言描述测试流程
-- AI 自动理解并执行
+### 1. **零代码编写** 🎨
+- ✨ 不需要学习任何 API
+- ✨ 直接用自然语言描述测试流程
+- ✨ AI 自动理解并执行
 
-### 2. **智能定位系统**
-- 规则匹配（85%）
-- XML 深度分析（5%）
-- 位置分析（5%）
-- **Cursor AI 视觉识别（免费，1%）** ⭐
+### 2. **智能定位系统** 🧠
+- 📊 规则匹配（85%）
+- 🔍 XML 深度分析（5%）
+- 📍 位置分析（5%）
+- **🎯 Cursor AI 视觉识别（免费，1%）** ⭐
 
-### 3. **操作即代码**
-- 执行完测试后，一键生成 pytest 脚本
-- 使用已验证的定位方式
-- 100% 可执行的测试代码
+### 3. **操作即代码** 📝
+- ✨ 执行完测试后，一键生成 pytest 脚本
+- ✨ 使用已验证的定位方式
+- ✨ 100% 可执行的测试代码
 
-### 4. **智能调试**
-- 失败时自动截图分析
-- AI 自动调整策略
-- 自动重试和错误处理
+### 4. **智能调试** 🔧
+- ✨ 失败时自动截图分析
+- ✨ AI 自动调整策略
+- ✨ 自动重试和错误处理
 
 ---
 
 ## 🚀 开始使用
+
+<div align="center">
 
 ```bash
 # 1. 安装
@@ -344,25 +431,31 @@ pip install mobile-mcp-ai
 # 5. 开始用自然语言测试！
 ```
 
-**现在就试试吧！** 🎉
+**🎉 现在就试试吧！**
+
+</div>
 
 ---
 
 ## 📄 License
 
-Apache License 2.0
+<div align="center">
+
+**Apache License 2.0**
+
+</div>
 
 ---
 
 ## 🤝 贡献
 
+<div align="center">
+
 欢迎提交 Issue 和 Pull Request！
 
-**GitHub 仓库**：https://github.com/test111ddff-hash/mobile-mcp-ai
+**🐙 GitHub 仓库**: [test111ddff-hash/mobile-mcp-ai](https://github.com/test111ddff-hash/mobile-mcp-ai)
 
 ---
-
-<div align="center">
 
 **⭐ 如果这个项目对你有帮助，请给个 Star！⭐**
 
