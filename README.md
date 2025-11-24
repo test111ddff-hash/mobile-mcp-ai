@@ -104,20 +104,6 @@ pytest tests/test_建议发帖.py -v
 - [常见问题](docs/FAQ.md) - FAQ 和故障排除
 - [iOS 设置](docs/IOS_SETUP.md) - iOS 设备配置指南
 
-## 工作原理
-
-1. 在 Cursor 中用自然语言描述测试流程
-2. AI 自动执行每一步操作（智能定位、自动重试）
-3. 执行完成后，可以生成 pytest 格式的测试脚本
-4. 生成的脚本使用已验证的定位方式，可直接运行
-
-## 定位策略
-
-- 规则匹配（约 85%）
-- XML 深度分析（约 5%）
-- 位置分析（约 5%）
-- Cursor AI 视觉识别（约 1%，免费）
-
 ## License
 
 Apache License 2.0
