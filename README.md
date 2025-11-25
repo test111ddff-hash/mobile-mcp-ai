@@ -2,9 +2,16 @@
 
 移动端自动化测试框架，支持通过 Cursor AI 用自然语言执行测试并生成 pytest 测试用例。
 
+<div align="center">
+
 [![PyPI version](https://img.shields.io/pypi/v/mobile-mcp-ai.svg)](https://pypi.org/project/mobile-mcp-ai/)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
+[![Gitee Stars](https://gitee.com/chang-xinping/mobile-automation-mcp-service/badge/star.svg?theme=white)](https://gitee.com/chang-xinping/mobile-automation-mcp-service)
+
+**如果这个项目对你有帮助，请给个 ⭐ Star 支持一下！**
+
+</div>
 
 ## 功能特性
 
@@ -142,4 +149,14 @@ Apache License 2.0
 
 欢迎提交 Issue 和 Pull Request！
 
-GitHub: [test111ddff-hash/mobile-mcp-ai](https://github.com/test111ddff-hash/mobile-mcp-ai)
+---
+
+<div align="center">
+
+**⭐ 如果这个项目对你有帮助，请给个 Star 支持一下！⭐**
+
+[![Gitee Stars](https://gitee.com/chang-xinping/mobile-automation-mcp-service/badge/star.svg?theme=dark)](https://gitee.com/chang-xinping/mobile-automation-mcp-service/stargazers)
+
+[Gitee 仓库](https://gitee.com/chang-xinping/mobile-automation-mcp-service) | [GitHub 仓库](https://github.com/test111ddff-hash/mobile-mcp-ai)
+
+</div>
