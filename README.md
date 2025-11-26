@@ -102,14 +102,6 @@ pip install --upgrade mobile-mcp-ai
 pip show mobile-mcp-ai
 ```
 
-**v2.1.0 升级说明**：
-- ✅ **向后兼容**：无需修改现有代码
-- ✅ **默认启用验证**：所有操作自动验证，更可靠
-- ✅ **可选快速模式**：如需要可设置 `verify=False`
-- ✅ **无破坏性更改**：平滑升级，放心使用
-
-**升级后重启 Cursor**：升级完成后需要完全退出并重新启动 Cursor 才能生效。
-
 ## 🚀 快速开始
 
 ### 1. 配置 Cursor MCP
