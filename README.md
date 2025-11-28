@@ -10,16 +10,6 @@
 [![Gitee Stars](https://gitee.com/chang-xinping/mobile-automation-mcp-service/badge/star.svg?theme=white)](https://gitee.com/chang-xinping/mobile-automation-mcp-service)
 
 **⭐ 如果这个项目对你有帮助，请给个 Star 支持一下！⭐**
-
-**🆕 v2.1.0 重大更新：智能验证系统 - 彻底解决"假成功"问题**
-
-**✨ 核心改进：**
-- ✅ **所有操作支持智能验证**：click、input、swipe、press_key 全部验证
-- ✅ **实时检测操作结果**：页面变化、文本验证、内容变化检测
-- ✅ **搜索键智能回退**：SEARCH 无效时自动尝试 ENTER
-- ✅ **详细验证反馈**：返回验证状态、实际结果、警告信息
-- ✅ **向后兼容**：默认启用验证，可选 `verify=False` 快速模式
-
 </div>
 
 ## ✨ 核心特性
