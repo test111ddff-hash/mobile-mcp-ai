@@ -41,14 +41,9 @@ setup(
     packages=[
         'mobile_mcp',
         'mobile_mcp.core',
-        'mobile_mcp.core.ai',
-        'mobile_mcp.core.assertion',
-        'mobile_mcp.core.h5',
-        'mobile_mcp.core.locator',
         'mobile_mcp.core.utils',
         'mobile_mcp.mcp',
         'mobile_mcp.utils',
-        'mobile_mcp.vision',
     ],
     # 将 mobile_mcp 映射到当前目录
     package_dir={'mobile_mcp': '.'},
