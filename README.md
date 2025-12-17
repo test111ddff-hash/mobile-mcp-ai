@@ -94,6 +94,12 @@ Cursor AI 自动分析截图，精准定位 UI 元素，游戏、原生应用通
 
 ---
 
+## 🚀 快速开始
+
+**新用户？** 查看 **[5 分钟快速入门指南 →](QUICKSTART.md)**
+
+---
+
 ## 📦 安装
 
 ```bash
@@ -139,45 +145,128 @@ tidevice list
 
 ---
 
-## ⚙️ 配置 Cursor
+## 🎯 新用户快速入门
+
+### 第一步：安装
+
+```bash
+pip install mobile-mcp-ai
+```
+
+### 第二步：连接设备
+
+**Android 用户：**
+```bash
+# 开启手机 USB 调试，连接电脑
+adb devices
+```
+
+**iOS 用户：**
+```bash
+# 安装依赖
+pip install tidevice facebook-wda
+brew install libimobiledevice
+
+# 检查连接
+tidevice list
+```
+
+> 📖 iOS 需要额外配置 WebDriverAgent，详见 **[iOS 配置指南](docs/iOS_SETUP_GUIDE.md)**
+
+### 第三步：配置 Cursor
 
 编辑 `~/.cursor/mcp.json`：
 
-### Android 配置
+```json
+{
+  "mcpServers": {
+    "mobile-automation": {
+      "command": "mobile-mcp"
+    }
+  }
+}
+```
+
+> 💡 提示：会自动检测 Android/iOS 设备，无需额外配置
+
+### 第四步：重启 Cursor
+
+保存配置后，**重启 Cursor** 使配置生效。
+
+### 第五步：开始使用
+
+在 Cursor 中输入：
+
+```
+@MCP 检查设备连接
+```
+
+```
+@MCP 截图看看当前页面
+```
+
+```
+@MCP 点击"登录"按钮
+```
+
+---
+
+## ⚙️ 高级配置
+
+### 方式一：pip 安装后配置（推荐）
+
+先安装：`pip install mobile-mcp-ai`
 
 ```json
 {
   "mcpServers": {
     "mobile-automation": {
-      "command": "python",
-      "args": ["-m", "mobile_mcp.mcp.mcp_server"],
-      "cwd": "/your/project/path",
+      "command": "mobile-mcp"
+    }
+  }
+}
+```
+
+### 方式二：源码方式配置
+
+如果你是从源码运行：
+
+**Android 配置：**
+
+```json
+{
+  "mcpServers": {
+    "mobile-automation": {
+      "command": "/path/to/your/venv/bin/python",
+      "args": ["-m", "mobile_mcp.mcp_tools.mcp_server"],
+      "cwd": "/path/to/mobile_mcp",
       "env": {
-        "DEFAULT_PLATFORM": "android"
+        "MOBILE_PLATFORM": "android"
       }
     }
   }
 }
 ```
 
-### iOS 配置
+**iOS 配置：**
 
 ```json
 {
   "mcpServers": {
     "mobile-automation": {
-      "command": "python",
-      "args": ["-m", "mobile_mcp.mcp.mcp_server"],
-      "cwd": "/your/project/path",
+      "command": "/path/to/your/venv/bin/python",
+      "args": ["-m", "mobile_mcp.mcp_tools.mcp_server"],
+      "cwd": "/path/to/mobile_mcp",
       "env": {
-        "DEFAULT_PLATFORM": "ios",
-        "IOS_SUPPORT_ENABLED": "true"
+        "MOBILE_PLATFORM": "ios"
       }
     }
   }
 }
 ```
 
+> ⚠️ 请将 `/path/to/` 替换为你的实际路径
+> 
 > 📖 iOS 需要先配置 WebDriverAgent，详见 **[iOS 配置指南](docs/iOS_SETUP_GUIDE.md)**
 
 保存后**重启 Cursor**。

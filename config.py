@@ -43,9 +43,10 @@ class Config:
     ).lower() == "true"
     
     # 默认平台（"android" 或 "ios"）
+    # 兼容两种环境变量名：MOBILE_PLATFORM（新）和 DEFAULT_PLATFORM（旧）
     DEFAULT_PLATFORM: str = os.getenv(
-        "DEFAULT_PLATFORM",
-        "android"
+        "MOBILE_PLATFORM",
+        os.getenv("DEFAULT_PLATFORM", "android")
     )
     
     # Android支持（默认启用）

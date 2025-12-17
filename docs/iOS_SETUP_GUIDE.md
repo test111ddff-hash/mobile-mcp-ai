@@ -120,7 +120,25 @@ curl http://localhost:8100/status
 
 ## ⚙️ 配置 Mobile MCP
 
-### 方式 1：Cursor MCP 配置（推荐）
+### 方式 1：pip 安装后配置（推荐）
+
+先安装：`pip install mobile-mcp-ai`
+
+然后编辑 `~/.cursor/mcp.json`：
+
+```json
+{
+  "mcpServers": {
+    "mobile-automation": {
+      "command": "mobile-mcp"
+    }
+  }
+}
+```
+
+> 💡 提示：pip 安装后会自动检测设备类型（iOS/Android），无需手动配置平台
+
+### 方式 2：源码方式配置
 
 编辑 `~/.cursor/mcp.json`：
 
@@ -129,28 +147,25 @@ curl http://localhost:8100/status
   "mcpServers": {
     "mobile-automation": {
       "command": "/path/to/your/venv/bin/python",
-      "args": ["-m", "mobile_mcp.mcp_server"],
+      "args": ["-m", "mobile_mcp.mcp_tools.mcp_server"],
       "cwd": "/path/to/mobile_mcp",
       "env": {
-        "MOBILE_DEVICE_ID": "auto",
-        "DEFAULT_PLATFORM": "ios",
-        "IOS_SUPPORT_ENABLED": "true"
+        "MOBILE_PLATFORM": "ios"
       }
     }
   }
 }
 ```
 
-### 方式 2：.env 文件
+> ⚠️ 请将 `/path/to/` 替换为你的实际路径
+
+### 方式 3：.env 文件（仅源码开发）
 
 在项目根目录创建 `.env` 文件：
 
 ```bash
 # 平台配置
-DEFAULT_PLATFORM=ios
-
-# iOS 支持
-IOS_SUPPORT_ENABLED=true
+MOBILE_PLATFORM=ios
 
 # 设备 ID（auto=自动选择）
 MOBILE_DEVICE_ID=auto
@@ -163,9 +178,9 @@ LOG_LEVEL=INFO
 
 | 环境变量 | 说明 | 默认值 |
 |---------|------|--------|
-| `DEFAULT_PLATFORM` | 默认平台 (`ios` 或 `android`) | `android` |
-| `IOS_SUPPORT_ENABLED` | 是否启用 iOS 支持 | `true` |
+| `MOBILE_PLATFORM` | 平台类型 (`ios` 或 `android`) | 自动检测 |
 | `MOBILE_DEVICE_ID` | 设备 ID，`auto` 自动选择 | `auto` |
+| `LOG_LEVEL` | 日志级别 | `INFO` |
 
 ## 🔄 每次使用流程
 
@@ -261,17 +276,23 @@ tidevice uninstall com.xxx.xxx
 
 编辑 `~/.cursor/mcp.json`：
 ```json
-"DEFAULT_PLATFORM": "ios"
+"env": {
+  "MOBILE_PLATFORM": "ios"
+}
 ```
 
 ### 切换到 Android
 
 编辑 `~/.cursor/mcp.json`：
 ```json
-"DEFAULT_PLATFORM": "android"
+"env": {
+  "MOBILE_PLATFORM": "android"
+}
 ```
 
 > ⚠️ 修改配置后需要重启 Cursor 生效
+> 
+> 💡 提示：如果使用 pip 安装方式（`command: "mobile-mcp"`），会自动检测设备类型，无需手动配置
 
 ## ✅ 快速检查清单
 
@@ -287,7 +308,7 @@ tidevice uninstall com.xxx.xxx
 - [ ] WDA 服务已启动（Xcode ⌘+U）
 - [ ] iproxy 端口转发已运行
 - [ ] `curl http://localhost:8100/status` 返回成功
-- [ ] MCP 配置已设置 `DEFAULT_PLATFORM=ios`
+- [ ] MCP 配置已正确设置（pip 安装自动检测，或源码设置 `MOBILE_PLATFORM=ios`）
 - [ ] 已重启 Cursor 使配置生效
 
 ## 🎯 完整流程总结
@@ -296,12 +317,13 @@ tidevice uninstall com.xxx.xxx
 ┌─────────────────────────────────────────────────────────┐
 │                    首次配置（一次性）                      │
 ├─────────────────────────────────────────────────────────┤
-│  1. 安装依赖：pip3 install tidevice facebook-wda        │
-│  2. 安装 iproxy：brew install libimobiledevice          │
-│  3. 克隆 WebDriverAgent 项目                            │
-│  4. Xcode 配置签名 → 编译安装到 iPhone（⌘+U）            │
-│  5. iPhone 信任开发者证书                                │
-│  6. 配置 MCP：DEFAULT_PLATFORM=ios                      │
+│  1. 安装依赖：pip install mobile-mcp-ai                 │
+│  2. 安装 iOS 工具：pip install tidevice facebook-wda    │
+│  3. 安装 iproxy：brew install libimobiledevice          │
+│  4. 克隆 WebDriverAgent 项目                            │
+│  5. Xcode 配置签名 → 编译安装到 iPhone（⌘+U）            │
+│  6. iPhone 信任开发者证书                                │
+│  7. 配置 Cursor MCP（会自动检测 iOS 设备）               │
 └─────────────────────────────────────────────────────────┘
                            ↓
 ┌─────────────────────────────────────────────────────────┐

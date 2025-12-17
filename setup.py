@@ -25,7 +25,7 @@ if requirements_file.exists():
 
 setup(
     name="mobile-mcp-ai",
-    version="2.2.7",  # 添加iOS设备自动检测和支持
+    version="2.2.8",  # 合并mcp_server，修复包名冲突
     author="douzi",
     author_email="1492994674@qq.com",
     description="移动端自动化 MCP Server - 支持 Android/iOS，AI 功能可选（基础工具不需要 AI）",
@@ -42,7 +42,7 @@ setup(
         'mobile_mcp',
         'mobile_mcp.core',
         'mobile_mcp.core.utils',
-        'mobile_mcp.mcp',
+        'mobile_mcp.mcp_tools',
         'mobile_mcp.utils',
     ],
     # 将 mobile_mcp 映射到当前目录
@@ -111,7 +111,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'mobile-mcp=mobile_mcp.mcp.mcp_server:main',
+            'mobile-mcp=mobile_mcp.mcp_tools.mcp_server:main',
         ],
     },
     keywords=[

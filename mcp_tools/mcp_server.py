@@ -1,19 +1,29 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Mobile MCP Server Lite - 精简版（纯 MCP，依赖 Cursor 视觉能力）
+Mobile MCP Server - 统一入口
 
-特点：
-- 不需要 AI 密钥，完全依赖 Cursor 的视觉分析能力
-- 核心工具精简到 ~20 个
-- 保留 pytest 脚本生成功能
+纯 MCP 方案，完全依赖 Cursor 视觉能力：
+- 不需要 AI 密钥
+- 20 个核心工具
 - 支持 Android 和 iOS
+- 保留 pytest 脚本生成
 
-工作流程：
-1. mobile_take_screenshot -> 截图
-2. Cursor AI 分析图片 -> 返回坐标
-3. mobile_click_at_coords -> 点击坐标
-4. mobile_generate_test_script -> 生成测试脚本
+使用方式：
+    python mcp_server.py
+    
+配置 Cursor：
+    {
+        "mcpServers": {
+            "mobile": {
+                "command": "/path/to/venv/bin/python",
+                "args": ["/path/to/mobile_mcp/mcp_server.py"],
+                "env": {
+                    "MOBILE_PLATFORM": "android"  // 或 "ios"
+                }
+            }
+        }
+    }
 """
 
 import asyncio
@@ -22,17 +32,25 @@ import os
 import sys
 from pathlib import Path
 from typing import Optional
-import importlib.util
 
-# 🔧 关键：直接从 site-packages 加载系统的 mcp 包
-# 避免被本地 mcp 目录覆盖
-def _load_system_mcp():
-    """从 site-packages 加载系统的 mcp 包"""
+# 添加项目根目录到 Python 路径
+# __file__ 在 mcp/ 目录下，需要往上两级到项目根目录
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+# 尝试导入 MCP，处理可能的路径冲突
+try:
+    from mcp.types import Tool, TextContent
+    from mcp.server import Server
+    from mcp.server.stdio import stdio_server
+except ImportError:
+    # 如果本地 mcp 目录冲突，从 site-packages 加载
+    import importlib.util
     import site
+    
     for site_dir in site.getsitepackages():
         mcp_types_path = Path(site_dir) / 'mcp' / 'types.py'
         if mcp_types_path.exists():
-            # 找到了系统的 mcp 包
             mcp_pkg_path = Path(site_dir) / 'mcp'
             
             # 加载 mcp.types
@@ -44,9 +62,9 @@ def _load_system_mcp():
             # 加载 mcp.server
             server_init = mcp_pkg_path / 'server' / '__init__.py'
             spec = importlib.util.spec_from_file_location("mcp.server", server_init)
-            mcp_server = importlib.util.module_from_spec(spec)
-            sys.modules['mcp.server'] = mcp_server
-            spec.loader.exec_module(mcp_server)
+            mcp_server_mod = importlib.util.module_from_spec(spec)
+            sys.modules['mcp.server'] = mcp_server_mod
+            spec.loader.exec_module(mcp_server_mod)
             
             # 加载 mcp.server.stdio
             stdio_path = mcp_pkg_path / 'server' / 'stdio.py'
@@ -55,36 +73,26 @@ def _load_system_mcp():
             sys.modules['mcp.server.stdio'] = mcp_stdio
             spec.loader.exec_module(mcp_stdio)
             
-            return mcp_types, mcp_server, mcp_stdio
-    
-    raise ImportError("Cannot find system mcp package in site-packages")
-
-_mcp_types, _mcp_server, _mcp_stdio = _load_system_mcp()
-
-Tool = _mcp_types.Tool
-TextContent = _mcp_types.TextContent
-Server = _mcp_server.Server
-stdio_server = _mcp_stdio.stdio_server
-
-# 添加项目路径
-mobile_mcp_dir = Path(__file__).parent.parent
-sys.path.insert(0, str(mobile_mcp_dir.parent))
-
-from mobile_mcp.core.mobile_client import MobileClient
-from mobile_mcp.core.basic_tools_lite import BasicMobileToolsLite
+            Tool = mcp_types.Tool
+            TextContent = mcp_types.TextContent
+            Server = mcp_server_mod.Server
+            stdio_server = mcp_stdio.stdio_server
+            break
+    else:
+        raise ImportError("Cannot find mcp package")
 
 
-class MobileMCPServerLite:
-    """精简版 Mobile MCP Server"""
+class MobileMCPServer:
+    """Mobile MCP Server - 精简版"""
     
     def __init__(self):
-        self.client: Optional[MobileClient] = None
-        self.tools: Optional[BasicMobileToolsLite] = None
+        self.client = None
+        self.tools = None
         self._initialized = False
     
     @staticmethod
     def format_response(result) -> str:
-        """统一格式化返回值为 JSON 字符串"""
+        """统一格式化返回值"""
         if isinstance(result, (dict, list)):
             return json.dumps(result, ensure_ascii=False, indent=2)
         return str(result)
@@ -97,12 +105,14 @@ class MobileMCPServerLite:
         platform = self._detect_platform()
         
         try:
+            from mobile_mcp.core.mobile_client import MobileClient
+            from mobile_mcp.core.basic_tools_lite import BasicMobileToolsLite
+            
             self.client = MobileClient(platform=platform)
             self.tools = BasicMobileToolsLite(self.client)
             print(f"📱 已连接到 {platform.upper()} 设备", file=sys.stderr)
         except Exception as e:
             print(f"⚠️ 设备连接失败: {e}", file=sys.stderr)
-            # 创建占位符，部分功能仍可用
             self.client = type('MockClient', (), {'platform': platform})()
             self.tools = None
         
@@ -126,24 +136,33 @@ class MobileMCPServerLite:
         return "android"
     
     def get_tools(self):
-        """注册精简版 MCP 工具（约 20 个）"""
+        """注册 MCP 工具（20 个）"""
         tools = []
         
-        # ==================== 截图（核心！给 Cursor 看）====================
+        # ==================== 元素定位（优先使用）====================
+        tools.append(Tool(
+            name="mobile_list_elements",
+            description="📋 列出页面所有可交互元素（优先使用！）。返回 resource_id, text, bounds 等。\n\n"
+                       "🎯 定位策略（按优先级）：\n"
+                       "1️⃣ 先调用此工具获取元素列表\n"
+                       "2️⃣ 如果有 text/id，用 mobile_click_by_text 或 mobile_click_by_id\n"
+                       "3️⃣ 如果是游戏/无法获取元素，用截图 + mobile_click_at_coords",
+            inputSchema={"type": "object", "properties": {}, "required": []}
+        ))
+        
+        # ==================== 截图（视觉兜底）====================
         tools.append(Tool(
             name="mobile_take_screenshot",
-            description="📸 截图（核心工具）。截图后 Cursor 会自动分析图片，找到你需要的元素位置。\n\n"
-                       "使用示例：\n"
-                       "1. 调用此工具截图\n"
-                       "2. Cursor 分析图片，告诉你坐标\n"
-                       "3. 使用 mobile_click_at_coords 点击",
+            description="📸 截图（视觉定位用）。返回截图路径和屏幕尺寸。\n\n"
+                       "🎯 使用场景：\n"
+                       "- 游戏（Unity/Cocos）无法获取元素时\n"
+                       "- mobile_list_elements 返回空时\n"
+                       "- 需要确认页面状态时\n\n"
+                       "⚠️ 截图分辨率 = 屏幕分辨率，坐标可直接使用",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "description": {
-                        "type": "string",
-                        "description": "截图描述（可选），用于生成文件名"
-                    }
+                    "description": {"type": "string", "description": "截图描述（可选）"}
                 },
                 "required": []
             }
@@ -151,28 +170,15 @@ class MobileMCPServerLite:
         
         tools.append(Tool(
             name="mobile_get_screen_size",
-            description="📐 获取屏幕尺寸。用于计算坐标比例。",
+            description="📐 获取屏幕尺寸。用于确认坐标范围。",
             inputSchema={"type": "object", "properties": {}, "required": []}
         ))
         
         # ==================== 点击操作 ====================
         tools.append(Tool(
-            name="mobile_click_at_coords",
-            description="👆 点击指定坐标（核心工具）。配合截图使用，Cursor 分析图片后告诉你坐标。\n\n"
-                       "✅ 点击成功后会自动等待 0.3 秒",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "x": {"type": "number", "description": "X 坐标（像素）"},
-                    "y": {"type": "number", "description": "Y 坐标（像素）"}
-                },
-                "required": ["x", "y"]
-            }
-        ))
-        
-        tools.append(Tool(
             name="mobile_click_by_text",
-            description="👆 通过文本点击元素。适合文本完全匹配的场景。",
+            description="👆 通过文本点击（推荐！）。适合有明确文本的按钮。\n"
+                       "✅ 比坐标点击更稳定，不受屏幕分辨率影响",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -184,13 +190,30 @@ class MobileMCPServerLite:
         
         tools.append(Tool(
             name="mobile_click_by_id",
-            description="👆 通过 resource-id 点击元素。需要先用 mobile_list_elements 获取 ID。",
+            description="👆 通过 resource-id 点击（推荐！）。需要先用 mobile_list_elements 获取 ID。\n"
+                       "✅ 最稳定的定位方式",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "resource_id": {"type": "string", "description": "元素的 resource-id"}
                 },
                 "required": ["resource_id"]
+            }
+        ))
+        
+        tools.append(Tool(
+            name="mobile_click_at_coords",
+            description="👆 点击指定坐标（视觉定位用）。配合截图使用。\n\n"
+                       "🎯 使用场景：游戏或无法获取元素时\n"
+                       "⚠️ 坐标 = 截图中的像素坐标，无需转换\n"
+                       "✅ 点击成功后自动等待 0.3 秒",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "x": {"type": "number", "description": "X 坐标（像素）"},
+                    "y": {"type": "number", "description": "Y 坐标（像素）"}
+                },
+                "required": ["x", "y"]
             }
         ))
         
@@ -270,7 +293,7 @@ class MobileMCPServerLite:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "package_name": {"type": "string", "description": "应用包名，如 'com.example.app'"}
+                    "package_name": {"type": "string", "description": "应用包名"}
                 },
                 "required": ["package_name"]
             }
@@ -315,13 +338,6 @@ class MobileMCPServerLite:
         
         # ==================== 辅助工具 ====================
         tools.append(Tool(
-            name="mobile_list_elements",
-            description="📋 列出页面所有可交互元素。返回 resource_id, text, bounds 等信息。\n"
-                       "💡 提示：对于游戏等无法获取元素的场景，建议用截图 + 坐标点击。",
-            inputSchema={"type": "object", "properties": {}, "required": []}
-        ))
-        
-        tools.append(Tool(
             name="mobile_assert_text",
             description="✅ 检查页面是否包含指定文本。用于验证操作结果。",
             inputSchema={
@@ -333,10 +349,10 @@ class MobileMCPServerLite:
             }
         ))
         
-        # ==================== pytest 脚本生成（保留）====================
+        # ==================== pytest 脚本生成 ====================
         tools.append(Tool(
             name="mobile_get_operation_history",
-            description="📜 获取操作历史记录。查看之前执行的所有操作。",
+            description="📜 获取操作历史记录。",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -354,15 +370,15 @@ class MobileMCPServerLite:
         
         tools.append(Tool(
             name="mobile_generate_test_script",
-            description="📝 生成 pytest 测试脚本。基于操作历史自动生成可执行的测试代码。\n\n"
+            description="📝 生成 pytest 测试脚本。基于操作历史自动生成。\n\n"
                        "使用流程：\n"
-                       "1. 执行一系列操作（点击、输入等）\n"
+                       "1. 执行一系列操作\n"
                        "2. 调用此工具生成脚本\n"
                        "3. 脚本保存到 tests/ 目录",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "test_name": {"type": "string", "description": "测试用例名称，如 '登录测试'"},
+                    "test_name": {"type": "string", "description": "测试用例名称"},
                     "package_name": {"type": "string", "description": "App 包名"},
                     "filename": {"type": "string", "description": "脚本文件名（不含 .py）"}
                 },
@@ -476,13 +492,15 @@ class MobileMCPServerLite:
                 return [TextContent(type="text", text=f"❌ 未知工具: {name}")]
         
         except Exception as e:
-            return [TextContent(type="text", text=f"❌ 执行失败: {str(e)}")]
+            import traceback
+            error_msg = f"❌ 执行失败: {str(e)}\n{traceback.format_exc()}"
+            return [TextContent(type="text", text=error_msg)]
 
 
-async def main():
-    """启动精简版 MCP Server"""
-    server = MobileMCPServerLite()
-    mcp_server = Server("mobile-mcp-lite")
+async def async_main():
+    """启动 MCP Server（异步版本）"""
+    server = MobileMCPServer()
+    mcp_server = Server("mobile-mcp")
     
     @mcp_server.list_tools()
     async def list_tools():
@@ -492,13 +510,19 @@ async def main():
     async def call_tool(name: str, arguments: dict):
         return await server.handle_tool_call(name, arguments)
     
-    print("🚀 Mobile MCP Server Lite 启动中... [精简版 - 20 个工具]", file=sys.stderr)
-    print("💡 完全依赖 Cursor 视觉能力，无需 AI 密钥", file=sys.stderr)
+    print("🚀 Mobile MCP Server 启动中... [20 个工具]", file=sys.stderr)
+    print("📱 支持 Android / iOS", file=sys.stderr)
+    print("👁️ 完全依赖 Cursor 视觉能力，无需 AI 密钥", file=sys.stderr)
     
     async with stdio_server() as (read_stream, write_stream):
         await mcp_server.run(read_stream, write_stream, mcp_server.create_initialization_options())
 
 
+def main():
+    """入口点函数（供 pip 安装后使用）"""
+    asyncio.run(async_main())
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
 

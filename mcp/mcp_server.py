@@ -34,12 +34,52 @@ from pathlib import Path
 from typing import Optional
 
 # 添加项目根目录到 Python 路径
-project_root = Path(__file__).parent
-sys.path.insert(0, str(project_root.parent))
+# __file__ 在 mcp/ 目录下，需要往上两级到项目根目录
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
 
-from mcp.types import Tool, TextContent
-from mcp.server import Server
-from mcp.server.stdio import stdio_server
+# 尝试导入 MCP，处理可能的路径冲突
+try:
+    from mcp.types import Tool, TextContent
+    from mcp.server import Server
+    from mcp.server.stdio import stdio_server
+except ImportError:
+    # 如果本地 mcp 目录冲突，从 site-packages 加载
+    import importlib.util
+    import site
+    
+    for site_dir in site.getsitepackages():
+        mcp_types_path = Path(site_dir) / 'mcp' / 'types.py'
+        if mcp_types_path.exists():
+            mcp_pkg_path = Path(site_dir) / 'mcp'
+            
+            # 加载 mcp.types
+            spec = importlib.util.spec_from_file_location("mcp.types", mcp_types_path)
+            mcp_types = importlib.util.module_from_spec(spec)
+            sys.modules['mcp.types'] = mcp_types
+            spec.loader.exec_module(mcp_types)
+            
+            # 加载 mcp.server
+            server_init = mcp_pkg_path / 'server' / '__init__.py'
+            spec = importlib.util.spec_from_file_location("mcp.server", server_init)
+            mcp_server_mod = importlib.util.module_from_spec(spec)
+            sys.modules['mcp.server'] = mcp_server_mod
+            spec.loader.exec_module(mcp_server_mod)
+            
+            # 加载 mcp.server.stdio
+            stdio_path = mcp_pkg_path / 'server' / 'stdio.py'
+            spec = importlib.util.spec_from_file_location("mcp.server.stdio", stdio_path)
+            mcp_stdio = importlib.util.module_from_spec(spec)
+            sys.modules['mcp.server.stdio'] = mcp_stdio
+            spec.loader.exec_module(mcp_stdio)
+            
+            Tool = mcp_types.Tool
+            TextContent = mcp_types.TextContent
+            Server = mcp_server_mod.Server
+            stdio_server = mcp_stdio.stdio_server
+            break
+    else:
+        raise ImportError("Cannot find mcp package")
 
 
 class MobileMCPServer:
@@ -457,8 +497,8 @@ class MobileMCPServer:
             return [TextContent(type="text", text=error_msg)]
 
 
-async def main():
-    """启动 MCP Server"""
+async def async_main():
+    """启动 MCP Server（异步版本）"""
     server = MobileMCPServer()
     mcp_server = Server("mobile-mcp")
     
@@ -478,6 +518,11 @@ async def main():
         await mcp_server.run(read_stream, write_stream, mcp_server.create_initialization_options())
 
 
+def main():
+    """入口点函数（供 pip 安装后使用）"""
+    asyncio.run(async_main())
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
 
