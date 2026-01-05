@@ -156,12 +156,15 @@ class MobileMCPServer:
         # ==================== 截图（视觉兜底）====================
         tools.append(Tool(
             name="mobile_take_screenshot",
-            description="📸 截图（视觉定位用）。返回截图路径和屏幕尺寸。\n\n"
+            description="📸 截图（视觉定位用）。返回截图路径、屏幕尺寸和图片尺寸。\n\n"
                        "🎯 使用场景：\n"
                        "- 游戏（Unity/Cocos）无法获取元素时\n"
                        "- mobile_list_elements 返回空时\n"
                        "- 需要确认页面状态时\n\n"
-                       "⚠️ 截图分辨率 = 屏幕分辨率，坐标可直接使用",
+                       "⚠️ 【重要】截图会被压缩！\n"
+                       "   - screen_width/screen_height = 原始屏幕尺寸\n"
+                       "   - image_width/image_height = 压缩后图片尺寸（AI 看到的）\n"
+                       "   - 点击时必须传入 image_width/image_height 让工具自动转换坐标！",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -215,13 +218,17 @@ class MobileMCPServer:
                        "- 游戏（Unity/Cocos）无法获取元素\n"
                        "- mobile_list_elements 返回空\n"
                        "- 元素没有 id 和 text\n\n"
-                       "✅ 自动记录百分比坐标，生成脚本时会转换为跨分辨率兼容的百分比定位\n"
-                       "💡 录制测试脚本时，请先调用 mobile_list_elements 尝试获取元素！",
+                       "⚠️ 【重要】如果坐标来自压缩截图，必须传入 image_width 和 image_height！\n"
+                       "   截图返回的 image_width/image_height 字段就是需要传入的值。\n"
+                       "   工具会自动将图片坐标转换为屏幕坐标。\n\n"
+                       "✅ 自动记录百分比坐标，生成脚本时会转换为跨分辨率兼容的百分比定位",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "x": {"type": "number", "description": "X 坐标（像素）"},
-                    "y": {"type": "number", "description": "Y 坐标（像素）"}
+                    "x": {"type": "number", "description": "X 坐标（像素，来自截图分析或屏幕坐标）"},
+                    "y": {"type": "number", "description": "Y 坐标（像素，来自截图分析或屏幕坐标）"},
+                    "image_width": {"type": "number", "description": "截图的宽度（可选，传入后自动转换坐标）"},
+                    "image_height": {"type": "number", "description": "截图的高度（可选，传入后自动转换坐标）"}
                 },
                 "required": ["x", "y"]
             }
@@ -446,7 +453,12 @@ class MobileMCPServer:
             
             # 点击
             elif name == "mobile_click_at_coords":
-                result = self.tools.click_at_coords(arguments["x"], arguments["y"])
+                result = self.tools.click_at_coords(
+                    arguments["x"], 
+                    arguments["y"],
+                    arguments.get("image_width", 0),
+                    arguments.get("image_height", 0)
+                )
                 return [TextContent(type="text", text=self.format_response(result))]
             
             elif name == "mobile_click_by_text":

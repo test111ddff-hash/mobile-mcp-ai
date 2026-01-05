@@ -109,6 +109,9 @@ class BasicMobileToolsLite:
                 img = Image.open(temp_path)
                 
                 # 第3步：缩小尺寸（保持宽高比）
+                # 记录压缩后的图片尺寸（用于坐标转换）
+                image_width, image_height = img.width, img.height
+                
                 if img.width > max_width:
                     ratio = max_width / img.width
                     new_w = max_width
@@ -125,6 +128,8 @@ class BasicMobileToolsLite:
                             # Pillow 旧版本
                             resample = Image.ANTIALIAS
                     img = img.resize((new_w, new_h), resample)
+                    # 更新为压缩后的尺寸
+                    image_width, image_height = new_w, new_h
                 
                 # 第4步：生成最终文件名（JPEG 格式）
                 if description:
@@ -160,14 +165,18 @@ class BasicMobileToolsLite:
                     "screenshot_path": str(final_path),
                     "screen_width": screen_width,
                     "screen_height": screen_height,
+                    "image_width": image_width,
+                    "image_height": image_height,
                     "original_size": f"{original_size/1024:.1f}KB",
                     "compressed_size": f"{compressed_size/1024:.1f}KB",
                     "saved_percent": f"{saved_percent:.0f}%",
                     "message": f"📸 截图已保存: {final_path}\n"
                               f"📐 屏幕尺寸: {screen_width}x{screen_height}\n"
+                              f"🖼️ 图片尺寸: {image_width}x{image_height}（AI 分析用）\n"
                               f"📦 已压缩: {original_size/1024:.0f}KB → {compressed_size/1024:.0f}KB (省 {saved_percent:.0f}%)\n"
-                              f"💡 Cursor 分析图片后，返回的坐标可直接用于 mobile_click_at_coords\n"
-                              f"💡 或使用 mobile_click_by_percent 进行跨设备兼容点击"
+                              f"⚠️ 【重要】AI 返回的坐标需要转换！\n"
+                              f"   请使用 mobile_click_at_coords 并传入 image_width={image_width}, image_height={image_height}\n"
+                              f"   工具会自动将图片坐标转换为屏幕坐标"
                 }
             else:
                 # 不压缩，直接重命名临时文件
@@ -180,11 +189,14 @@ class BasicMobileToolsLite:
                 final_path = self.screenshot_dir / filename
                 temp_path.rename(final_path)
                 
+                # 不压缩时，图片尺寸 = 屏幕尺寸
                 return {
                     "success": True,
                     "screenshot_path": str(final_path),
                     "screen_width": screen_width,
                     "screen_height": screen_height,
+                    "image_width": screen_width,
+                    "image_height": screen_height,
                     "file_size": f"{original_size/1024:.1f}KB",
                     "message": f"📸 截图已保存: {final_path}\n"
                               f"📐 屏幕尺寸: {screen_width}x{screen_height}\n"
@@ -226,11 +238,14 @@ class BasicMobileToolsLite:
                 width = info.get('displayWidth', 0)
                 height = info.get('displayHeight', 0)
             
+            # 不压缩时，图片尺寸 = 屏幕尺寸
             return {
                 "success": True,
                 "screenshot_path": str(screenshot_path),
                 "screen_width": width,
                 "screen_height": height,
+                "image_width": width,
+                "image_height": height,
                 "message": f"📸 截图已保存: {screenshot_path}\n"
                           f"📐 屏幕尺寸: {width}x{height}\n"
                           f"⚠️ 未压缩（PIL 未安装），建议安装: pip install Pillow"
@@ -266,24 +281,50 @@ class BasicMobileToolsLite:
     
     # ==================== 点击操作 ====================
     
-    def click_at_coords(self, x: int, y: int) -> Dict:
-        """点击坐标（核心功能）"""
+    def click_at_coords(self, x: int, y: int, image_width: int = 0, image_height: int = 0) -> Dict:
+        """点击坐标（核心功能，支持自动坐标转换）
+        
+        Args:
+            x: X 坐标（来自截图分析或屏幕坐标）
+            y: Y 坐标（来自截图分析或屏幕坐标）
+            image_width: 截图的宽度（可选，传入后自动转换坐标）
+            image_height: 截图的高度（可选，传入后自动转换坐标）
+        
+        坐标转换说明：
+            如果截图被压缩过（如 1080→720），AI 返回的坐标是基于压缩图的。
+            传入 image_width/image_height 后，工具会自动将坐标转换为屏幕坐标。
+        """
         try:
-            # 获取屏幕尺寸（用于后续转换百分比）
+            # 获取屏幕尺寸
             screen_width, screen_height = 0, 0
             if self._is_ios():
                 ios_client = self._get_ios_client()
                 if ios_client and hasattr(ios_client, 'wda'):
-                    ios_client.wda.click(x, y)
                     size = ios_client.wda.window_size()
                     screen_width, screen_height = size[0], size[1]
                 else:
                     return {"success": False, "message": "❌ iOS 客户端未初始化"}
             else:
-                self.client.u2.click(x, y)
                 info = self.client.u2.info
                 screen_width = info.get('displayWidth', 0)
                 screen_height = info.get('displayHeight', 0)
+            
+            # 🎯 坐标转换：如果传入了图片尺寸，将图片坐标转换为屏幕坐标
+            original_x, original_y = x, y
+            converted = False
+            if image_width > 0 and image_height > 0 and screen_width > 0 and screen_height > 0:
+                if image_width != screen_width or image_height != screen_height:
+                    # 按比例转换坐标
+                    x = int(x * screen_width / image_width)
+                    y = int(y * screen_height / image_height)
+                    converted = True
+            
+            # 执行点击
+            if self._is_ios():
+                ios_client = self._get_ios_client()
+                ios_client.wda.click(x, y)
+            else:
+                self.client.u2.click(x, y)
             
             time.sleep(0.3)
             
@@ -303,10 +344,18 @@ class BasicMobileToolsLite:
                 ref=f"coords_{x}_{y}"
             )
             
-            return {
-                "success": True,
-                "message": f"✅ 点击成功: ({x}, {y}) [相对位置: {x_percent}%, {y_percent}%]"
-            }
+            if converted:
+                return {
+                    "success": True,
+                    "message": f"✅ 点击成功: ({x}, {y})\n"
+                              f"   📐 坐标已转换: ({original_x},{original_y}) → ({x},{y})\n"
+                              f"   🖼️ 图片尺寸: {image_width}x{image_height} → 屏幕: {screen_width}x{screen_height}"
+                }
+            else:
+                return {
+                    "success": True,
+                    "message": f"✅ 点击成功: ({x}, {y}) [相对位置: {x_percent}%, {y_percent}%]"
+                }
         except Exception as e:
             return {"success": False, "message": f"❌ 点击失败: {e}"}
     
