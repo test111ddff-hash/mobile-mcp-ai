@@ -388,18 +388,44 @@ class MobileMCPServer:
         
         # ==================== 辅助工具 ====================
         tools.append(Tool(
-            name="mobile_close_popup",
-            description="""🚫 智能关闭弹窗（推荐！）
+            name="mobile_find_close_button",
+            description="""🔍 智能查找关闭按钮（只找不点，返回位置）
 
-自动从控件树识别关闭按钮并点击。
+从元素树中找最可能的关闭按钮，返回坐标和百分比位置。
+
+🎯 识别策略（优先级）：
+1. 文本匹配：×、X、关闭、取消、跳过 等
+2. 描述匹配：content-desc 包含 close/关闭
+3. 小尺寸 clickable 元素（右上角优先）
+
+✅ 返回内容：
+- 坐标 (x, y) 和百分比 (x%, y%)
+- 推荐的点击命令：mobile_click_by_percent(x%, y%)
+- 多个候选位置（供确认）
+
+💡 使用流程：
+1. 调用此工具找到关闭按钮位置
+2. 确认位置正确后，用 mobile_click_by_percent 点击
+3. 百分比点击兼容不同分辨率手机""",
+            inputSchema={"type": "object", "properties": {}, "required": []}
+        ))
+        
+        tools.append(Tool(
+            name="mobile_close_popup",
+            description="""🚫 智能关闭弹窗（直接点击）
+
+自动识别并点击关闭按钮，一步完成。
 
 🎯 识别策略：
-1. 找 clickable=true 且尺寸小（30-100px）的元素
-2. 位置在屏幕右上角区域
-3. 计算 bounds 中心点一次点击
+1. 文本匹配：×、X、关闭、取消、跳过 等
+2. 描述匹配：content-desc 包含 close/关闭  
+3. ImageView/ImageButton 小元素
+4. clickable 的小尺寸元素（角落位置优先）
 
-✅ 优势：比视觉识别更精准，一次成功率高
-❌ 限制：如果关闭按钮是图片的一部分（无独立控件），需要用截图+坐标点击""",
+⚠️ 如果自动识别失败：
+- 会截图供 AI 分析
+- 用 mobile_find_close_button 先查看候选位置
+- 或用 mobile_click_by_percent 手动点击""",
             inputSchema={"type": "object", "properties": {}, "required": []}
         ))
         
@@ -558,6 +584,10 @@ class MobileMCPServer:
             # 辅助
             elif name == "mobile_list_elements":
                 result = self.tools.list_elements()
+                return [TextContent(type="text", text=self.format_response(result))]
+            
+            elif name == "mobile_find_close_button":
+                result = self.tools.find_close_button()
                 return [TextContent(type="text", text=self.format_response(result))]
             
             elif name == "mobile_close_popup":

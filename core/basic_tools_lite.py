@@ -1376,10 +1376,19 @@ class BasicMobileToolsLite:
             if not close_candidates:
                 # 控件树未找到，自动截全屏图供 AI 分析
                 screenshot_result = self.take_screenshot(description="弹窗全屏", compress=True)
+                
+                # 构建更详细的视觉分析提示
+                visual_hint = "请仔细查看截图，找到关闭按钮（通常是 × 或 X 图标）。"
+                if popup_bounds:
+                    px1, py1, px2, py2 = popup_bounds
+                    visual_hint += f" 弹窗区域大约在 [{px1},{py1}] 到 [{px2},{py2}]，关闭按钮通常在弹窗的右上角或正上方。"
+                else:
+                    visual_hint += " 关闭按钮通常在屏幕右上角、弹窗右上角、或弹窗下方中间位置。"
+                
                 return {
                     "success": False,
                     "message": "❌ 控件树未找到关闭按钮，已截全屏图供 AI 视觉分析",
-                    "action_required": "请分析截图找到 X 关闭按钮位置，然后调用 mobile_click_at_coords",
+                    "action_required": visual_hint + " 找到后调用 mobile_click_at_coords(x, y, image_width, image_height, original_img_width, original_img_height) 点击。",
                     "screenshot": screenshot_result.get("screenshot_path", ""),
                     "screen_size": {"width": screen_width, "height": screen_height},
                     "image_size": {
@@ -1392,7 +1401,14 @@ class BasicMobileToolsLite:
                     },
                     "popup_detected": popup_bounds is not None,
                     "popup_bounds": f"[{popup_bounds[0]},{popup_bounds[1]}][{popup_bounds[2]},{popup_bounds[3]}]" if popup_bounds else None,
-                    "tip": "找到 X 按钮后，直接调用 mobile_click_at_coords(x, y, image_width, image_height, original_img_width, original_img_height)"
+                    "search_areas": [
+                        "弹窗右上角（最常见）",
+                        "弹窗正上方外侧（浮动X按钮）",
+                        "弹窗下方中间（某些广告）",
+                        "屏幕右上角"
+                    ],
+                    "button_features": "关闭按钮通常是：小圆形/方形图标、灰色或白色、带有 × 或 X 符号",
+                    "tip": "注意：不要点击广告内容区域，只点击关闭按钮"
                 }
             
             # 按得分排序，取最可能的
@@ -1401,7 +1417,10 @@ class BasicMobileToolsLite:
             
             # 点击
             self.client.u2.click(best['center_x'], best['center_y'])
-            time.sleep(0.3)
+            time.sleep(0.5)
+            
+            # 点击后截图，让 AI 判断是否成功
+            screenshot_result = self.take_screenshot("关闭弹窗后")
             
             # 记录操作（使用百分比，跨设备兼容）
             self._record_operation(
@@ -1415,20 +1434,30 @@ class BasicMobileToolsLite:
                 ref=f"close_popup_{best['position']}"
             )
             
+            # 返回候选按钮列表，让 AI 看截图判断
+            # 如果弹窗还在，AI 可以选择点击其他候选按钮
             return {
                 "success": True,
-                "message": f"✅ 点击关闭按钮 ({best['position']}): ({best['center_x']}, {best['center_y']})",
-                "match_type": best['match_type'],
-                "bounds": best['bounds'],
-                "position": best['position'],
-                "percent": f"({best['x_percent']}%, {best['y_percent']}%)",
+                "message": f"✅ 已点击关闭按钮 ({best['position']}): ({best['center_x']}, {best['center_y']})",
+                "clicked": {
+                    "position": best['position'],
+                    "match_type": best['match_type'],
+                    "coords": (best['center_x'], best['center_y']),
+                    "percent": (best['x_percent'], best['y_percent'])
+                },
+                "screenshot": screenshot_result.get("screenshot_path", ""),
                 "popup_detected": popup_bounds is not None,
                 "popup_bounds": f"[{popup_bounds[0]},{popup_bounds[1]}][{popup_bounds[2]},{popup_bounds[3]}]" if popup_bounds else None,
-                "candidates_count": len(close_candidates),
-                "top_candidates": [
-                    {"position": c['position'], "type": c['match_type'], "score": round(c['score'], 1)}
-                    for c in close_candidates[:3]
-                ]
+                "other_candidates": [
+                    {
+                        "position": c['position'], 
+                        "type": c['match_type'], 
+                        "coords": (c['center_x'], c['center_y']),
+                        "percent": (c['x_percent'], c['y_percent'])
+                    }
+                    for c in close_candidates[1:4]  # 返回其他3个候选，AI 可以选择
+                ],
+                "tip": "请查看截图判断弹窗是否已关闭。如果弹窗还在，可以尝试点击 other_candidates 中的其他位置；如果误点跳转了，请按返回键"
             }
             
         except Exception as e:
