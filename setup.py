@@ -25,7 +25,7 @@ if requirements_file.exists():
 
 setup(
     name="mobile-mcp-ai",
-    version="2.3.7",  # 优化输入定位(多ID元素智能选择) + close_popup + 修复设备重连
+    version="2.3.9",  # close_popup改进：弹窗区域检测+浮动关闭按钮支持
     author="douzi",
     author_email="1492994674@qq.com",
     description="移动端自动化 MCP Server - 支持 Android/iOS，AI 功能可选（基础工具不需要 AI）",
