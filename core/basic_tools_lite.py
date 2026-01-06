@@ -56,8 +56,9 @@ class BasicMobileToolsLite:
     # ==================== 截图 ====================
     
     def take_screenshot(self, description: str = "", compress: bool = True, 
-                        max_width: int = 720, quality: int = 75) -> Dict:
-        """截图（支持压缩，省 token）
+                        max_width: int = 720, quality: int = 75,
+                        crop_x: int = 0, crop_y: int = 0, crop_size: int = 0) -> Dict:
+        """截图（支持压缩和局部裁剪）
         
         压缩原理：
         1. 先截取原始 PNG 图片
@@ -65,11 +66,20 @@ class BasicMobileToolsLite:
         3. 转换为 JPEG 格式 + 降低质量（如 100% → 75%）
         4. 最终文件从 2MB 压缩到约 80KB（节省 96%）
         
+        局部裁剪（用于精确识别小元素）：
+        - 第一次全屏截图，AI 返回大概坐标
+        - 第二次传入 crop_x, crop_y, crop_size 截取局部区域
+        - 局部区域不压缩，保持清晰度，AI 可精确识别
+        - 返回 crop_offset_x/y 用于坐标换算
+        
         Args:
             description: 截图描述（可选）
             compress: 是否压缩（默认 True，推荐开启省 token）
             max_width: 压缩后最大宽度（默认 720，对 AI 识别足够）
             quality: JPEG 质量 1-100（默认 75，肉眼几乎看不出区别）
+            crop_x: 裁剪中心点 X 坐标（屏幕坐标，0 表示不裁剪）
+            crop_y: 裁剪中心点 Y 坐标（屏幕坐标，0 表示不裁剪）
+            crop_size: 裁剪区域大小（默认 0 不裁剪，推荐 200-400）
         
         压缩效果示例：
             原图 PNG: 2048KB
@@ -104,12 +114,69 @@ class BasicMobileToolsLite:
             
             original_size = temp_path.stat().st_size
             
-            if compress:
-                # 第2步：打开图片
-                img = Image.open(temp_path)
+            # 第2步：打开图片
+            img = Image.open(temp_path)
+            
+            # 第2.5步：局部裁剪（如果指定了裁剪参数）
+            crop_offset_x, crop_offset_y = 0, 0
+            is_cropped = False
+            
+            if crop_x > 0 and crop_y > 0 and crop_size > 0:
+                # 计算裁剪区域（以 crop_x, crop_y 为中心）
+                half_size = crop_size // 2
+                left = max(0, crop_x - half_size)
+                top = max(0, crop_y - half_size)
+                right = min(img.width, crop_x + half_size)
+                bottom = min(img.height, crop_y + half_size)
                 
+                # 记录偏移量（用于坐标换算）
+                crop_offset_x = left
+                crop_offset_y = top
+                
+                # 裁剪
+                img = img.crop((left, top, right, bottom))
+                is_cropped = True
+            
+            # ========== 情况1：局部裁剪截图（不压缩，保持清晰度）==========
+            if is_cropped:
+                # 生成文件名
+                if description:
+                    safe_desc = re.sub(r'[^\w\s-]', '', description).strip().replace(' ', '_')
+                    filename = f"screenshot_{platform}_crop_{safe_desc}_{timestamp}.png"
+                else:
+                    filename = f"screenshot_{platform}_crop_{timestamp}.png"
+                
+                final_path = self.screenshot_dir / filename
+                
+                # 保存为 PNG（保持清晰度）
+                img.save(str(final_path), "PNG")
+                
+                # 删除临时文件
+                temp_path.unlink()
+                
+                cropped_size = final_path.stat().st_size
+                
+                return {
+                    "success": True,
+                    "screenshot_path": str(final_path),
+                    "screen_width": screen_width,
+                    "screen_height": screen_height,
+                    "image_width": img.width,
+                    "image_height": img.height,
+                    "crop_offset_x": crop_offset_x,
+                    "crop_offset_y": crop_offset_y,
+                    "file_size": f"{cropped_size/1024:.1f}KB",
+                    "message": f"🔍 局部截图已保存: {final_path}\n"
+                              f"📐 裁剪区域: ({crop_offset_x}, {crop_offset_y}) 起，{img.width}x{img.height} 像素\n"
+                              f"📦 文件大小: {cropped_size/1024:.0f}KB\n"
+                              f"🎯 【坐标换算】AI 返回坐标 (x, y) 后：\n"
+                              f"   实际屏幕坐标 = ({crop_offset_x} + x, {crop_offset_y} + y)\n"
+                              f"   或直接调用 mobile_click_at_coords(x, y, crop_offset_x={crop_offset_x}, crop_offset_y={crop_offset_y})"
+                }
+            
+            # ========== 情况2：全屏压缩截图 ==========
+            elif compress:
                 # 第3步：缩小尺寸（保持宽高比）
-                # 记录压缩后的图片尺寸（用于坐标转换）
                 image_width, image_height = img.width, img.height
                 
                 if img.width > max_width:
@@ -118,20 +185,16 @@ class BasicMobileToolsLite:
                     new_h = int(img.height * ratio)
                     # 兼容不同版本的 Pillow
                     try:
-                        # Pillow 10.0.0+
                         resample = Image.Resampling.LANCZOS
                     except AttributeError:
                         try:
-                            # Pillow 9.x
                             resample = Image.LANCZOS
                         except AttributeError:
-                            # Pillow 旧版本
                             resample = Image.ANTIALIAS
                     img = img.resize((new_w, new_h), resample)
-                    # 更新为压缩后的尺寸
                     image_width, image_height = new_w, new_h
                 
-                # 第4步：生成最终文件名（JPEG 格式）
+                # 生成文件名（JPEG 格式）
                 if description:
                     safe_desc = re.sub(r'[^\w\s-]', '', description).strip().replace(' ', '_')
                     filename = f"screenshot_{platform}_{safe_desc}_{timestamp}.jpg"
@@ -140,10 +203,8 @@ class BasicMobileToolsLite:
                 
                 final_path = self.screenshot_dir / filename
                 
-                # 第5步：保存为 JPEG（PNG 可能有透明通道，需转 RGB）
-                # 先转换为 RGB 模式，处理可能的 RGBA 或 P 模式
+                # 保存为 JPEG（处理透明通道）
                 if img.mode in ('RGBA', 'LA', 'P'):
-                    # 创建白色背景
                     background = Image.new('RGB', img.size, (255, 255, 255))
                     if img.mode == 'P':
                         img = img.convert('RGBA')
@@ -153,8 +214,6 @@ class BasicMobileToolsLite:
                     img = img.convert("RGB")
                 
                 img.save(str(final_path), "JPEG", quality=quality)
-                
-                # 第6步：删除临时 PNG
                 temp_path.unlink()
                 
                 compressed_size = final_path.stat().st_size
@@ -178,8 +237,9 @@ class BasicMobileToolsLite:
                               f"   请使用 mobile_click_at_coords 并传入 image_width={image_width}, image_height={image_height}\n"
                               f"   工具会自动将图片坐标转换为屏幕坐标"
                 }
+            
+            # ========== 情况3：全屏不压缩截图 ==========
             else:
-                # 不压缩，直接重命名临时文件
                 if description:
                     safe_desc = re.sub(r'[^\w\s-]', '', description).strip().replace(' ', '_')
                     filename = f"screenshot_{platform}_{safe_desc}_{timestamp}.png"
@@ -189,7 +249,6 @@ class BasicMobileToolsLite:
                 final_path = self.screenshot_dir / filename
                 temp_path.rename(final_path)
                 
-                # 不压缩时，图片尺寸 = 屏幕尺寸
                 return {
                     "success": True,
                     "screenshot_path": str(final_path),
@@ -281,7 +340,8 @@ class BasicMobileToolsLite:
     
     # ==================== 点击操作 ====================
     
-    def click_at_coords(self, x: int, y: int, image_width: int = 0, image_height: int = 0) -> Dict:
+    def click_at_coords(self, x: int, y: int, image_width: int = 0, image_height: int = 0,
+                        crop_offset_x: int = 0, crop_offset_y: int = 0) -> Dict:
         """点击坐标（核心功能，支持自动坐标转换）
         
         Args:
@@ -289,10 +349,12 @@ class BasicMobileToolsLite:
             y: Y 坐标（来自截图分析或屏幕坐标）
             image_width: 截图的宽度（可选，传入后自动转换坐标）
             image_height: 截图的高度（可选，传入后自动转换坐标）
+            crop_offset_x: 局部截图的 X 偏移量（可选，局部截图时传入）
+            crop_offset_y: 局部截图的 Y 偏移量（可选，局部截图时传入）
         
         坐标转换说明：
-            如果截图被压缩过（如 1080→720），AI 返回的坐标是基于压缩图的。
-            传入 image_width/image_height 后，工具会自动将坐标转换为屏幕坐标。
+            1. 全屏压缩截图：传入 image_width/image_height，自动按比例转换
+            2. 局部裁剪截图：传入 crop_offset_x/crop_offset_y，自动加上偏移量
         """
         try:
             # 获取屏幕尺寸
@@ -309,15 +371,24 @@ class BasicMobileToolsLite:
                 screen_width = info.get('displayWidth', 0)
                 screen_height = info.get('displayHeight', 0)
             
-            # 🎯 坐标转换：如果传入了图片尺寸，将图片坐标转换为屏幕坐标
+            # 🎯 坐标转换
             original_x, original_y = x, y
             converted = False
-            if image_width > 0 and image_height > 0 and screen_width > 0 and screen_height > 0:
+            conversion_type = ""
+            
+            # 情况1：局部裁剪截图 - 加上偏移量
+            if crop_offset_x > 0 or crop_offset_y > 0:
+                x = x + crop_offset_x
+                y = y + crop_offset_y
+                converted = True
+                conversion_type = "crop_offset"
+            # 情况2：全屏压缩截图 - 按比例转换
+            elif image_width > 0 and image_height > 0 and screen_width > 0 and screen_height > 0:
                 if image_width != screen_width or image_height != screen_height:
-                    # 按比例转换坐标
                     x = int(x * screen_width / image_width)
                     y = int(y * screen_height / image_height)
                     converted = True
+                    conversion_type = "scale"
             
             # 执行点击
             if self._is_ios():
@@ -345,12 +416,19 @@ class BasicMobileToolsLite:
             )
             
             if converted:
-                return {
-                    "success": True,
-                    "message": f"✅ 点击成功: ({x}, {y})\n"
-                              f"   📐 坐标已转换: ({original_x},{original_y}) → ({x},{y})\n"
-                              f"   🖼️ 图片尺寸: {image_width}x{image_height} → 屏幕: {screen_width}x{screen_height}"
-                }
+                if conversion_type == "crop_offset":
+                    return {
+                        "success": True,
+                        "message": f"✅ 点击成功: ({x}, {y})\n"
+                                  f"   🔍 局部截图坐标转换: ({original_x},{original_y}) + 偏移({crop_offset_x},{crop_offset_y}) → ({x},{y})"
+                    }
+                else:
+                    return {
+                        "success": True,
+                        "message": f"✅ 点击成功: ({x}, {y})\n"
+                                  f"   📐 坐标已转换: ({original_x},{original_y}) → ({x},{y})\n"
+                                  f"   🖼️ 图片尺寸: {image_width}x{image_height} → 屏幕: {screen_width}x{screen_height}"
+                    }
             else:
                 return {
                     "success": True,
