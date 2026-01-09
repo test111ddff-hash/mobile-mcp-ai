@@ -25,7 +25,7 @@ if requirements_file.exists():
 
 setup(
     name="mobile-mcp-ai",
-    version="2.4.2",  # iOS依赖更新 + click_by_som提示优化
+    version="2.4.3",  # 优化弹窗X按钮点击精度
     author="douzi",
     author_email="1492994674@qq.com",
     description="移动端自动化 MCP Server - 支持 Android/iOS，AI 功能可选（基础工具不需要 AI）",
