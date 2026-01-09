@@ -657,15 +657,21 @@ class BasicMobileToolsLite:
                         popup_height = py2 - py1
                         
                         # 计算多个可能的 X 按钮位置（基于弹窗尺寸动态计算）
-                        # 使用弹窗尺寸的百分比偏移，适配不同分辨率屏幕
-                        offset_x = max(25, int(popup_width * 0.05))  # 宽度的5%，最小25px
-                        offset_y = max(25, int(popup_height * 0.04))  # 高度的4%，最小25px
-                        outer_offset = max(15, int(popup_width * 0.025))  # 外部偏移
+                        # 【优化】X按钮有三种常见位置：
+                        # 1. 弹窗边界上方（浮动X按钮）
+                        # 2. 弹窗内靠近顶部边界（内嵌X按钮）
+                        # 3. 弹窗正下方（底部关闭按钮）
+                        offset_x = max(60, int(popup_width * 0.07))   # 宽度7%，距右边界
+                        offset_y_above = max(35, int(popup_height * 0.025))  # 高度2.5%，在顶边界之上
+                        offset_y_near = max(45, int(popup_height * 0.03))    # 高度3%，紧贴顶边界内侧
                         
                         close_positions = [
-                            {"name": "右上内", "x": px2 - offset_x, "y": py1 + offset_y},  # 弹窗内右上角
-                            {"name": "右上外", "x": px2 + outer_offset, "y": py1 - outer_offset},  # 弹窗外右上角
-                            {"name": "正上方", "x": (px1 + px2) // 2, "y": py1 - offset_y},  # 弹窗正上方
+                            # 【最高优先级】弹窗内紧贴顶部边界（大多数X按钮在这里）
+                            {"name": "右上角", "x": px2 - offset_x, "y": py1 + offset_y_near},
+                            # 弹窗边界上方（浮动X按钮）
+                            {"name": "右上浮", "x": px2 - offset_x, "y": py1 - offset_y_above},
+                            # 弹窗正下方中间（底部关闭按钮）
+                            {"name": "正下方", "x": (px1 + px2) // 2, "y": py2 + max(50, int(popup_height * 0.04))},
                         ]
                         
                         # 用黄色/金色标注这些可能位置（始终显示）
@@ -2213,13 +2219,26 @@ class BasicMobileToolsLite:
                 # 如果检测到弹窗区域，先尝试点击常见的关闭按钮位置
                 if popup_bounds:
                     px1, py1, px2, py2 = popup_bounds
+                    popup_width = px2 - px1
+                    popup_height = py2 - py1
                     
-                    # 常见的关闭按钮位置
+                    # 【优化】X按钮有三种常见位置：
+                    # 1. 弹窗内靠近顶部边界（内嵌X按钮）- 最常见
+                    # 2. 弹窗边界上方（浮动X按钮）
+                    # 3. 弹窗正下方（底部关闭按钮）
+                    offset_x = max(60, int(popup_width * 0.07))   # 宽度7%
+                    offset_y_above = max(35, int(popup_height * 0.025))  # 高度2.5%，在边界之上
+                    offset_y_near = max(45, int(popup_height * 0.03))    # 高度3%，紧贴顶边界内侧
+                    
                     try_positions = [
-                        (px2 - 20, py1 - 30, "弹窗正上方"),
-                        (px2 - 30, py1 + 30, "弹窗右上角内"),
-                        (px2 + 20, py1 - 20, "弹窗右上角外"),
-                        ((px1 + px2) // 2, py2 + 40, "弹窗下方中间"),
+                        # 【最高优先级】弹窗内紧贴顶部边界
+                        (px2 - offset_x, py1 + offset_y_near, "弹窗右上角"),
+                        # 弹窗边界上方（浮动X按钮）
+                        (px2 - offset_x, py1 - offset_y_above, "弹窗右上浮"),
+                        # 弹窗正下方中间（底部关闭按钮）
+                        ((px1 + px2) // 2, py2 + max(50, int(popup_height * 0.04)), "弹窗下方中间"),
+                        # 弹窗正上方中间
+                        ((px1 + px2) // 2, py1 - 40, "弹窗正上方"),
                     ]
                     
                     for try_x, try_y, position_name in try_positions:
