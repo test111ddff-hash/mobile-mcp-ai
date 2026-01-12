@@ -25,7 +25,7 @@ if requirements_file.exists():
 
 setup(
     name="mobile-mcp-ai",
-    version="2.5.1",  # 修复：包含模板图片到 pip 包
+    version="2.5.2",  # 修复：模板图片放到包内目录
     author="douzi",
     author_email="1492994674@qq.com",
     description="移动端自动化 MCP Server - 支持 Android/iOS，AI 功能可选（基础工具不需要 AI）",
@@ -128,17 +128,10 @@ setup(
     ],
     include_package_data=True,
     zip_safe=False,
-    # 包含模板图片
-    data_files=[
-        ('templates/close_buttons', [
-            'templates/close_buttons/gray_x_stock_ad.png',
-            'templates/close_buttons/auto_x_0112_151217.png',
-            'templates/close_buttons/auto_x_0112_152037.png',
-            'templates/close_buttons/auto_x_0112_152840.png',
-            'templates/close_buttons/auto_x_0112_153256.png',
-            'templates/close_buttons/auto_x_0112_154847.png',
-        ]),
-    ],
+    # 包含模板图片到包内
+    package_data={
+        'mobile_mcp.core': ['templates/close_buttons/*.png'],
+    },
 )
 
 

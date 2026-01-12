@@ -24,9 +24,20 @@ class TemplateMatcher:
             template_dir: 模板目录路径，默认为 templates/close_buttons/
         """
         if template_dir is None:
-            # 默认模板目录
-            base_dir = Path(__file__).parent.parent
-            self.template_dir = base_dir / "templates" / "close_buttons"
+            # 默认模板目录：优先使用包内目录，其次使用项目根目录
+            core_dir = Path(__file__).parent
+            # 1. 包内目录 (pip 安装后)
+            pkg_template_dir = core_dir / "templates" / "close_buttons"
+            # 2. 项目根目录 (开发时)
+            root_template_dir = core_dir.parent / "templates" / "close_buttons"
+            
+            if pkg_template_dir.exists():
+                self.template_dir = pkg_template_dir
+            elif root_template_dir.exists():
+                self.template_dir = root_template_dir
+            else:
+                # 默认创建包内目录
+                self.template_dir = pkg_template_dir
         else:
             self.template_dir = Path(template_dir)
         
