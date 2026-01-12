@@ -100,9 +100,17 @@ class MobileMCPServer:
     
     async def initialize(self):
         """延迟初始化设备连接"""
-        # 如果已成功初始化，直接返回
+        # 如果已成功初始化，检查连接是否仍然有效
         if self._initialized and self.tools is not None:
-            return
+            # 验证设备连接是否仍然有效
+            if self._is_connection_valid():
+                return
+            else:
+                # 连接已失效，重置状态
+                print("⚠️ 检测到设备连接已断开，正在重新连接...", file=sys.stderr)
+                self._initialized = False
+                self.client = None
+                self.tools = None
         
         platform = self._detect_platform()
         
@@ -121,6 +129,33 @@ class MobileMCPServer:
             self.tools = None
             self._last_error = error_msg  # 保存错误信息
             # 不设置 _initialized = True，下次调用会重试
+    
+    def _is_connection_valid(self) -> bool:
+        """检查设备连接是否仍然有效"""
+        try:
+            if self.client is None:
+                return False
+            
+            # Android: 检查 u2 连接
+            if hasattr(self.client, 'u2') and self.client.u2:
+                # 尝试获取设备信息，如果失败说明连接断开
+                self.client.u2.info
+                return True
+            
+            # iOS: 检查 wda 连接
+            if hasattr(self.client, 'wda') and self.client.wda:
+                self.client.wda.status()
+                return True
+            
+            # iOS (通过 _ios_client)
+            if hasattr(self.client, '_ios_client') and self.client._ios_client:
+                if hasattr(self.client._ios_client, 'wda') and self.client._ios_client.wda:
+                    self.client._ios_client.wda.status()
+                    return True
+            
+            return False
+        except Exception:
+            return False
     
     def _detect_platform(self) -> str:
         """自动检测设备平台"""
