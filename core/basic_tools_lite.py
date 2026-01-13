@@ -2325,22 +2325,43 @@ class BasicMobileToolsLite:
             return 0.5
     
     def assert_text(self, text: str) -> Dict:
-        """检查页面是否包含文本"""
+        """检查页面是否包含文本（支持精确匹配和包含匹配）"""
         try:
+            exists = False
+            match_type = ""
+            
             if self._is_ios():
                 ios_client = self._get_ios_client()
                 if ios_client and hasattr(ios_client, 'wda'):
-                    exists = ios_client.wda(name=text).exists or ios_client.wda(label=text).exists
-                else:
-                    exists = False
+                    # 先尝试精确匹配
+                    if ios_client.wda(name=text).exists or ios_client.wda(label=text).exists:
+                        exists = True
+                        match_type = "精确匹配"
+                    # 再尝试包含匹配
+                    elif ios_client.wda(nameContains=text).exists or ios_client.wda(labelContains=text).exists:
+                        exists = True
+                        match_type = "包含匹配"
             else:
-                exists = self.client.u2(text=text).exists()
+                # Android: 先尝试精确匹配
+                if self.client.u2(text=text).exists():
+                    exists = True
+                    match_type = "精确匹配"
+                # 再尝试包含匹配
+                elif self.client.u2(textContains=text).exists():
+                    exists = True
+                    match_type = "包含匹配"
+            
+            if exists:
+                message = f"✅ 文本'{text}' 存在（{match_type}）"
+            else:
+                message = f"❌ 文本'{text}' 不存在"
             
             return {
                 "success": True,
                 "found": exists,
                 "text": text,
-                "message": f"✅ 文本'{text}' {'存在' if exists else '不存在'}"
+                "match_type": match_type if exists else None,
+                "message": message
             }
         except Exception as e:
             return {"success": False, "message": f"❌ 断言失败: {e}"}
