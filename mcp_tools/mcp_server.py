@@ -331,11 +331,13 @@ class MobileMCPServer:
             description="👆 通过 resource-id 点击元素（最推荐）\n\n"
                        "✅ 最稳定的定位方式\n"
                        "✅ 实时检测元素是否存在，元素不存在会报错\n"
-                       "📋 使用前先调用 mobile_list_elements 获取元素 ID",
+                       "📋 使用前先调用 mobile_list_elements 获取元素 ID\n"
+                       "💡 当有多个相同 ID 的元素时，用 index 指定第几个（从 0 开始）",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "resource_id": {"type": "string", "description": "元素的 resource-id"}
+                    "resource_id": {"type": "string", "description": "元素的 resource-id"},
+                    "index": {"type": "integer", "description": "第几个元素（从 0 开始），默认 0 表示第一个", "default": 0}
                 },
                 "required": ["resource_id"]
             }
@@ -860,7 +862,10 @@ class MobileMCPServer:
                 return [TextContent(type="text", text=self.format_response(result))]
             
             elif name == "mobile_click_by_id":
-                result = self.tools.click_by_id(arguments["resource_id"])
+                result = self.tools.click_by_id(
+                    arguments["resource_id"],
+                    arguments.get("index", 0)
+                )
                 return [TextContent(type="text", text=self.format_response(result))]
             
             elif name == "mobile_click_by_percent":

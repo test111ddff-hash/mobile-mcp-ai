@@ -1126,9 +1126,16 @@ class BasicMobileToolsLite:
         except Exception:
             return None
     
-    def click_by_id(self, resource_id: str) -> Dict:
-        """通过 resource-id 点击"""
+    def click_by_id(self, resource_id: str, index: int = 0) -> Dict:
+        """通过 resource-id 点击（支持点击第 N 个元素）
+        
+        Args:
+            resource_id: 元素的 resource-id
+            index: 第几个元素（从 0 开始），默认 0 表示第一个
+        """
         try:
+            index_desc = f"[{index}]" if index > 0 else ""
+            
             if self._is_ios():
                 ios_client = self._get_ios_client()
                 if ios_client and hasattr(ios_client, 'wda'):
@@ -1136,18 +1143,28 @@ class BasicMobileToolsLite:
                     if not elem.exists:
                         elem = ios_client.wda(name=resource_id)
                     if elem.exists:
-                        elem.click()
-                        time.sleep(0.3)
-                        self._record_operation('click', element=resource_id, ref=resource_id)
-                        return {"success": True, "message": f"✅ 点击成功: {resource_id}"}
+                        # 获取所有匹配的元素
+                        elements = elem.find_elements()
+                        if index < len(elements):
+                            elements[index].click()
+                            time.sleep(0.3)
+                            self._record_operation('click', element=f"{resource_id}{index_desc}", ref=resource_id, index=index)
+                            return {"success": True, "message": f"✅ 点击成功: {resource_id}{index_desc}"}
+                        else:
+                            return {"success": False, "message": f"❌ 索引超出范围: 找到 {len(elements)} 个元素，但请求索引 {index}"}
                     return {"success": False, "message": f"❌ 元素不存在: {resource_id}"}
             else:
                 elem = self.client.u2(resourceId=resource_id)
                 if elem.exists(timeout=0.5):
-                    elem.click()
-                    time.sleep(0.3)
-                    self._record_operation('click', element=resource_id, ref=resource_id)
-                    return {"success": True, "message": f"✅ 点击成功: {resource_id}"}
+                    # 获取匹配元素数量
+                    count = elem.count
+                    if index < count:
+                        elem[index].click()
+                        time.sleep(0.3)
+                        self._record_operation('click', element=f"{resource_id}{index_desc}", ref=resource_id, index=index)
+                        return {"success": True, "message": f"✅ 点击成功: {resource_id}{index_desc}" + (f" (共 {count} 个)" if count > 1 else "")}
+                    else:
+                        return {"success": False, "message": f"❌ 索引超出范围: 找到 {count} 个元素，但请求索引 {index}"}
                 return {"success": False, "message": f"❌ 元素不存在: {resource_id}"}
         except Exception as e:
             return {"success": False, "message": f"❌ 点击失败: {e}"}
