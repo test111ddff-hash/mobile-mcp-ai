@@ -189,8 +189,29 @@ class MobileClient:
             return xml_string
         
         # Android平台
-        # 获取XML
-        xml_string = self.u2.dump_hierarchy(compressed=False)
+        # 获取XML - 优先使用 ADB 直接 dump（更完整，包含 NAF 元素）
+        xml_string = None
+        try:
+            # 方法1: 使用 ADB 直接 dump（获取最完整的 UI 树，包括 NAF 元素）
+            import subprocess
+            import tempfile
+            import os
+            
+            # 在设备上执行 dump
+            self.u2.shell('uiautomator dump /sdcard/ui_dump.xml')
+            
+            # 读取文件内容
+            result = self.u2.shell('cat /sdcard/ui_dump.xml')
+            if result and isinstance(result, str) and result.strip().startswith('<?xml'):
+                xml_string = result.strip()
+                # 清理临时文件
+                self.u2.shell('rm /sdcard/ui_dump.xml')
+        except Exception as e:
+            print(f"  ⚠️  ADB dump 失败，使用 uiautomator2: {e}", file=sys.stderr)
+        
+        # 方法2: 回退到 uiautomator2 的 dump_hierarchy
+        if not xml_string:
+            xml_string = self.u2.dump_hierarchy(compressed=False)
         
         # 确保xml_string是字符串类型
         if not isinstance(xml_string, str):
