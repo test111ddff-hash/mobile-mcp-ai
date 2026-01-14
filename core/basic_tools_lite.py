@@ -2173,7 +2173,7 @@ class BasicMobileToolsLite:
     # ==================== 辅助工具 ====================
     
     def list_elements(self) -> List[Dict]:
-        """列出页面元素"""
+        """列出页面元素（已优化：过滤排版容器，保留功能控件）"""
         try:
             if self._is_ios():
                 ios_client = self._get_ios_client()
@@ -2184,22 +2184,139 @@ class BasicMobileToolsLite:
                 xml_string = self.client.u2.dump_hierarchy(compressed=False)
                 elements = self.client.xml_parser.parse(xml_string)
                 
+                # 功能控件类型（需要保留）
+                FUNCTIONAL_WIDGETS = {
+                    'TextView', 'Text', 'Label',  # 文本类
+                    'ImageView', 'Image', 'ImageButton',  # 图片类
+                    'Button', 'CheckBox', 'RadioButton', 'Switch',  # 交互类
+                    'SeekBar', 'ProgressBar', 'RatingBar',  # 滑动/进度类
+                    'EditText', 'TextInput',  # 输入类
+                    'VideoView', 'WebView',  # 特殊功能类
+                    'RecyclerView', 'ListView', 'GridView',  # 列表类
+                    'ScrollView', 'NestedScrollView',  # 滚动容器（有实际功能）
+                }
+                
+                # 容器控件类型（需要过滤，除非有业务ID）
+                CONTAINER_WIDGETS = {
+                    'FrameLayout', 'LinearLayout', 'RelativeLayout',
+                    'ViewGroup', 'ConstraintLayout', 'CoordinatorLayout',
+                    'CardView', 'View',  # 基础View也可能只是容器
+                }
+                
+                # 装饰类控件关键词（resource_id中包含这些关键词的通常可以过滤）
+                # 支持匹配如 qylt_item_short_video_shadow_one 这样的命名
+                DECORATIVE_KEYWORDS = {
+                    'shadow', 'divider', 'separator', 'line', 'border',
+                    'background', 'bg_', '_bg', 'decorative', 'decoration',
+                    '_shadow', 'shadow_', '_divider', 'divider_', '_line', 'line_'
+                }
+                
                 result = []
                 for elem in elements:
-                    # 获取文本内容（去除首尾空格）
+                    # 获取元素属性
+                    class_name = elem.get('class_name', '')
+                    resource_id = elem.get('resource_id', '').strip()
                     text = elem.get('text', '').strip()
-                    # 保留：可点击、可focus或有文本的元素
-                    if elem.get('clickable') or elem.get('focusable') or text:
+                    content_desc = elem.get('content_desc', '').strip()
+                    bounds = elem.get('bounds', '')
+                    clickable = elem.get('clickable', False)
+                    focusable = elem.get('focusable', False)
+                    scrollable = elem.get('scrollable', False)
+                    enabled = elem.get('enabled', True)
+                    
+                    # 1. 过滤 bounds="[0,0][0,0]" 的视觉隐藏元素
+                    if bounds == '[0,0][0,0]':
+                        continue
+                    
+                    # 2. 检查是否是功能控件（直接保留）
+                    if class_name in FUNCTIONAL_WIDGETS:
                         result.append({
-                            'resource_id': elem.get('resource_id', ''),
-                            'text': elem.get('text', ''),
-                            'content_desc': elem.get('content_desc', ''),
-                            'bounds': elem.get('bounds', ''),
-                            'clickable': elem.get('clickable', False)
+                            'resource_id': resource_id,
+                            'text': text,
+                            'content_desc': content_desc,
+                            'bounds': bounds,
+                            'clickable': clickable,
+                            'class': class_name
                         })
+                        continue
+                    
+                    # 3. 检查是否是容器控件
+                    if class_name in CONTAINER_WIDGETS:
+                        # 容器控件需要检查是否有业务相关的ID
+                        has_business_id = self._has_business_id(resource_id)
+                        if not has_business_id:
+                            # 无业务ID的容器控件，检查是否有其他有意义属性
+                            if not (clickable or focusable or scrollable or text or content_desc):
+                                # 所有属性都是默认值，过滤掉
+                                continue
+                        # 有业务ID或其他有意义属性，保留
+                        result.append({
+                            'resource_id': resource_id,
+                            'text': text,
+                            'content_desc': content_desc,
+                            'bounds': bounds,
+                            'clickable': clickable,
+                            'class': class_name
+                        })
+                        continue
+                    
+                    # 4. 检查是否是装饰类控件
+                    if resource_id:
+                        resource_id_lower = resource_id.lower()
+                        if any(keyword in resource_id_lower for keyword in DECORATIVE_KEYWORDS):
+                            # 是装饰类控件，且没有交互属性，过滤掉
+                            if not (clickable or focusable or text or content_desc):
+                                continue
+                    
+                    # 5. 检查是否所有属性均为默认值
+                    if not (text or content_desc or resource_id or clickable or focusable or scrollable):
+                        # 所有属性都是默认值，过滤掉
+                        continue
+                    
+                    # 6. 其他情况：有意义的元素保留
+                    result.append({
+                        'resource_id': resource_id,
+                        'text': text,
+                        'content_desc': content_desc,
+                        'bounds': bounds,
+                        'clickable': clickable,
+                        'class': class_name
+                    })
+                
                 return result
         except Exception as e:
             return [{"error": f"获取元素失败: {e}"}]
+    
+    def _has_business_id(self, resource_id: str) -> bool:
+        """
+        判断resource_id是否是业务相关的ID
+        
+        业务相关的ID通常包含：
+        - 有意义的命名（不是自动生成的）
+        - 不包含常见的自动生成模式
+        """
+        if not resource_id:
+            return False
+        
+        # 自动生成的ID模式（通常可以忽略）
+        auto_generated_patterns = [
+            r'^android:id/',  # 系统ID
+            r':id/\d+',  # 数字ID
+            r':id/view_\d+',  # view_数字
+            r':id/item_\d+',  # item_数字
+        ]
+        
+        for pattern in auto_generated_patterns:
+            if re.search(pattern, resource_id):
+                return False
+        
+        # 如果resource_id有实际内容且不是自动生成的，认为是业务ID
+        # 排除一些常见的系统ID
+        system_ids = ['android:id/content', 'android:id/statusBarBackground']
+        if resource_id in system_ids:
+            return False
+        
+        return True
     
     def find_close_button(self) -> Dict:
         """智能查找关闭按钮（不点击，只返回位置）
