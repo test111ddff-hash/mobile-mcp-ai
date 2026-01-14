@@ -610,22 +610,25 @@ class MobileMCPServer:
             name="mobile_find_close_button",
             description="""🔍 智能查找关闭按钮（只找不点，返回位置）
 
-从元素树中找最可能的关闭按钮，返回坐标和百分比位置。
+⚡ 【推荐首选】遇到弹窗时优先调用此工具！无需先截图。
+
+从元素树中找最可能的关闭按钮，返回坐标和推荐的点击命令。
 
 🎯 识别策略（优先级）：
-1. 文本匹配：×、X、关闭、取消、跳过 等
-2. 描述匹配：content-desc 包含 close/关闭
-3. 小尺寸 clickable 元素（右上角优先）
+1. 文本匹配：×、X、关闭、取消、跳过 等（得分100）
+2. resource-id 匹配：包含 close/dismiss/skip（得分95）
+3. content-desc 匹配：包含 close/关闭（得分90）
+4. 小尺寸 clickable 元素（右上角优先，得分70+）
 
 ✅ 返回内容：
 - 坐标 (x, y) 和百分比 (x%, y%)
-- 推荐的点击命令：mobile_click_by_percent(x%, y%)
-- 多个候选位置（供确认）
+- resource-id（如果有）
+- 推荐的点击命令（优先 click_by_id，其次 click_by_text，最后 click_by_percent）
 
 💡 使用流程：
-1. 调用此工具找到关闭按钮位置
-2. 确认位置正确后，用 mobile_click_by_percent 点击
-3. 百分比点击兼容不同分辨率手机""",
+1. 直接调用此工具（无需先截图/列元素）
+2. 根据返回的 click_command 执行点击
+3. 如果返回 success=false，才需要截图分析""",
             inputSchema={"type": "object", "properties": {}, "required": []}
         ))
         
@@ -711,24 +714,26 @@ class MobileMCPServer:
             name="mobile_close_ad",
             description="""🚫 【推荐】智能关闭广告弹窗
 
-专门用于关闭广告弹窗，按优先级自动尝试多种方式：
+⚡ 直接调用即可，无需先截图！会自动按优先级尝试：
 
-1️⃣ **控件树查找**（最可靠）
-   - 自动查找"关闭"、"跳过"、"×"等关闭按钮
+1️⃣ **控件树查找**（最可靠，优先）
+   - 自动查找 resource-id 包含 close/dismiss
+   - 查找文本"关闭"、"跳过"、"×"等
    - 找到直接点击，实时可靠
 
 2️⃣ **模板匹配**（次优）
    - 用 OpenCV 匹配已保存的 X 按钮模板
-   - 需要积累模板库，模板越多成功率越高
+   - 模板越多成功率越高
 
 3️⃣ **返回截图供 AI 分析**（兜底）
-   - 如果前两步失败，返回截图
+   - 前两步都失败才截图
    - AI 分析后用 mobile_click_by_percent 点击
-   - 点击成功后用 mobile_template_add 添加模板（自动学习）
+   - 点击成功后用 mobile_template_add 添加模板
 
-💡 使用流程：
-1. 遇到广告弹窗 → 调用此工具
+💡 正确流程：
+1. 遇到广告弹窗 → 直接调用此工具
 2. 如果成功 → 完成
+3. 只有失败时才需要截图分析
 3. 如果失败 → 看截图找 X → 点击 → 添加模板""",
             inputSchema={
                 "type": "object",

@@ -1906,6 +1906,7 @@ class BasicMobileToolsLite:
             for elem in root.iter():
                 text = elem.attrib.get('text', '')
                 content_desc = elem.attrib.get('content-desc', '')
+                resource_id = elem.attrib.get('resource-id', '')
                 bounds_str = elem.attrib.get('bounds', '')
                 class_name = elem.attrib.get('class', '')
                 clickable = elem.attrib.get('clickable', 'false') == 'true'
@@ -1939,6 +1940,13 @@ class BasicMobileToolsLite:
                 elif any(kw in content_desc.lower() for kw in ['关闭', 'close', 'dismiss', '跳过']):
                     score = 90
                     reason = f"描述='{content_desc}'"
+                
+                # 策略2.5：resource-id 包含关闭关键词（如 close_icon, ad_close 等）
+                elif resource_id and any(kw in resource_id.lower() for kw in ['close', 'dismiss', 'skip', 'cancel']):
+                    score = 95
+                    # 提取简短的 id 名
+                    short_id = resource_id.split('/')[-1] if '/' in resource_id else resource_id
+                    reason = f"resource-id='{short_id}'"
                 
                 # 策略3：小尺寸的 clickable 元素（可能是 X 图标）
                 elif clickable:
@@ -1974,7 +1982,9 @@ class BasicMobileToolsLite:
                         'center_y': center_y,
                         'x_percent': x_percent,
                         'y_percent': y_percent,
-                        'size': f"{width}x{height}"
+                        'size': f"{width}x{height}",
+                        'resource_id': resource_id,
+                        'text': text
                     })
             
             if not candidates:
@@ -2000,7 +2010,16 @@ class BasicMobileToolsLite:
             candidates.sort(key=lambda x: x['score'], reverse=True)
             best = candidates[0]
             
-            return {
+            # 生成推荐的点击命令（优先使用 resource-id）
+            if best.get('resource_id'):
+                short_id = best['resource_id'].split('/')[-1] if '/' in best['resource_id'] else best['resource_id']
+                click_cmd = f"mobile_click_by_id('{best['resource_id']}')"
+            elif best.get('text') and best['text'] in ['×', 'X', 'x', '关闭', '取消', '跳过', '知道了']:
+                click_cmd = f"mobile_click_by_text('{best['text']}')"
+            else:
+                click_cmd = f"mobile_click_by_percent({best['x_percent']}, {best['y_percent']})"
+            
+            result = {
                 "success": True,
                 "message": f"✅ 找到可能的关闭按钮",
                 "best_candidate": {
@@ -2011,13 +2030,21 @@ class BasicMobileToolsLite:
                     "size": best['size'],
                     "score": best['score']
                 },
-                "click_command": f"mobile_click_by_percent({best['x_percent']}, {best['y_percent']})",
+                "click_command": click_cmd,
                 "other_candidates": [
                     {"reason": c['reason'], "percent": f"({c['x_percent']}%, {c['y_percent']}%)", "score": c['score']}
                     for c in candidates[1:4]
                 ] if len(candidates) > 1 else [],
                 "screen_size": {"width": screen_width, "height": screen_height}
             }
+            
+            # 如果有 resource-id，额外提供
+            if best.get('resource_id'):
+                result["best_candidate"]["resource_id"] = best['resource_id']
+            if best.get('text'):
+                result["best_candidate"]["text"] = best['text']
+            
+            return result
             
         except Exception as e:
             return {"success": False, "message": f"❌ 查找关闭按钮失败: {e}"}
@@ -2958,6 +2985,16 @@ class BasicMobileToolsLite:
                         score += 10
                         reason = f"文本含'{kw}'"
                         break
+                
+                # resource-id 匹配（如 close_icon, ad_close 等）
+                if resource_id:
+                    res_id_lower = resource_id.lower()
+                    for kw in ['close', 'dismiss', 'skip', 'cancel']:
+                        if kw in res_id_lower:
+                            score += 9
+                            short_id = resource_id.split('/')[-1] if '/' in resource_id else resource_id
+                            reason = f"resource-id='{short_id}'"
+                            break
                 
                 # content-desc 匹配
                 for kw in close_content_desc:
