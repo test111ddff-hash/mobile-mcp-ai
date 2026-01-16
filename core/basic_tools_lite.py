@@ -2058,15 +2058,8 @@ class BasicMobileToolsLite:
             x_percent = round(x / screen_width * 100, 1) if screen_width > 0 else 0
             y_percent = round(y / screen_height * 100, 1) if screen_height > 0 else 0
             
-            self._record_operation(
-                'input', 
-                x=x, 
-                y=y, 
-                x_percent=x_percent,
-                y_percent=y_percent,
-                ref=f"coords_{x}_{y}", 
-                text=text
-            )
+            # 使用标准记录格式
+            self._record_input(text, 'percent', f"{x_percent}%,{y_percent}%", x_percent, y_percent)
             
             # 🎯 关键步骤：检查应用是否跳转，如果跳转则自动返回目标应用
             app_check = self._check_app_switched()
@@ -2512,6 +2505,19 @@ class BasicMobileToolsLite:
             import xml.etree.ElementTree as ET
             root = ET.fromstring(xml_string)
             
+            # 🔴 先检测是否有弹窗，避免误识别普通页面的按钮
+            popup_bounds, popup_confidence = self._detect_popup_with_confidence(
+                root, screen_width, screen_height
+            )
+            
+            if popup_bounds is None or popup_confidence < 0.5:
+                return {
+                    "success": True,
+                    "message": "ℹ️ 当前页面未检测到弹窗，无需查找关闭按钮",
+                    "popup_detected": False,
+                    "popup_confidence": popup_confidence
+                }
+            
             # 关闭按钮特征
             close_texts = ['×', 'X', 'x', '关闭', '取消', 'close', 'Close', '跳过', '知道了', '我知道了']
             candidates = []
@@ -2683,6 +2689,18 @@ class BasicMobileToolsLite:
                 
                 # 如果置信度不够高，记录但继续尝试查找关闭按钮
                 popup_detected = popup_bounds is not None and popup_confidence >= 0.6
+                
+                # 🔴 关键检查：如果没有检测到弹窗区域，直接返回"无弹窗"
+                # 避免误点击普通页面上的"关闭"、"取消"等按钮
+                if not popup_detected:
+                    return {
+                        "success": True,
+                        "message": "ℹ️ 当前页面未检测到弹窗，无需关闭",
+                        "popup_detected": False,
+                        "popup_confidence": popup_confidence,
+                        "action_required": None,
+                        "tip": "如果确实有弹窗但未被检测到，请使用 mobile_screenshot_with_som 截图后手动分析"
+                    }
                 
                 # ===== 第二步：在弹窗范围内查找关闭按钮 =====
                 for idx, elem in enumerate(all_elements):
@@ -2880,27 +2898,6 @@ class BasicMobileToolsLite:
                         "return_to_app": return_result,
                         "tip": "请查看截图确认弹窗是否已关闭。如果还在，可手动分析截图找到关闭按钮位置。"
                     }
-                
-                # 没有检测到弹窗区域，截图让 AI 分析
-                screenshot_result = self.take_screenshot(description="页面截图", compress=True)
-                
-                return {
-                    "success": False,
-                    "message": "❌ 未检测到弹窗区域，已截图供 AI 分析",
-                    "action_required": "请查看截图找到关闭按钮，调用 mobile_click_at_coords 点击",
-                    "screenshot": screenshot_result.get("screenshot_path", ""),
-                    "screen_size": {"width": screen_width, "height": screen_height},
-                    "image_size": {
-                        "width": screenshot_result.get("image_width", screen_width),
-                        "height": screenshot_result.get("image_height", screen_height)
-                    },
-                    "original_size": {
-                        "width": screenshot_result.get("original_img_width", screen_width),
-                        "height": screenshot_result.get("original_img_height", screen_height)
-                    },
-                    "search_areas": ["弹窗右上角", "弹窗正上方", "弹窗下方中间", "屏幕右上角"],
-                    "time_warning": "⚠️ 截图分析期间弹窗可能自动消失。如果是定时弹窗，建议等待其自动消失。"
-                }
             
             # 按得分排序，取最可能的
             close_candidates.sort(key=lambda x: x['score'], reverse=True)
@@ -2921,17 +2918,10 @@ class BasicMobileToolsLite:
             # 点击后截图，让 AI 判断是否成功
             screenshot_result = self.take_screenshot("关闭弹窗后")
             
-            # 记录操作（使用百分比，跨设备兼容）
-            self._record_operation(
-                'click',
-                x=best['center_x'],
-                y=best['center_y'],
-                x_percent=best['x_percent'],
-                y_percent=best['y_percent'],
-                screen_width=screen_width,
-                screen_height=screen_height,
-                ref=f"close_popup_{best['position']}"
-            )
+            # 使用标准记录格式
+            self._record_click('percent', f"{best['x_percent']}%,{best['y_percent']}%", 
+                              best['x_percent'], best['y_percent'],
+                              element_desc=f"关闭按钮({best['position']})")
             
             # 构建返回消息
             msg = f"✅ 已点击关闭按钮 ({best['position']}): ({best['center_x']}, {best['center_y']})"
@@ -3874,9 +3864,27 @@ class BasicMobileToolsLite:
         try:
             import xml.etree.ElementTree as ET
             
-            # ========== 第1步：控件树查找关闭按钮 ==========
+            # ========== 第0步：先检测是否有弹窗 ==========
             xml_string = self.client.u2.dump_hierarchy(compressed=False)
             root = ET.fromstring(xml_string)
+            
+            screen_width = self.client.u2.info.get('displayWidth', 1440)
+            screen_height = self.client.u2.info.get('displayHeight', 3200)
+            
+            popup_bounds, popup_confidence = self._detect_popup_with_confidence(
+                root, screen_width, screen_height
+            )
+            
+            # 如果没有检测到弹窗，直接返回"无弹窗"
+            if popup_bounds is None or popup_confidence < 0.5:
+                result["success"] = True
+                result["method"] = None
+                result["message"] = "ℹ️ 当前页面未检测到弹窗，无需关闭"
+                result["popup_detected"] = False
+                result["popup_confidence"] = popup_confidence
+                return result
+            
+            # ========== 第1步：控件树查找关闭按钮 ==========
             
             # 关闭按钮的常见特征
             close_keywords = ['关闭', '跳过', '×', 'X', 'x', 'close', 'skip', '取消']
@@ -4057,17 +4065,19 @@ class BasicMobileToolsLite:
             except Exception:
                 pass  # 模板匹配失败，继续下一步
             
-            # ========== 第3步：返回截图供 AI 分析 ==========
+            # ========== 第3步：确实有弹窗但找不到关闭按钮，返回截图供 AI 分析 ==========
+            # 注意：到达这里说明前面已经检测到弹窗（popup_confidence >= 0.5）
             if not screenshot_path:
                 screenshot_result = self.take_screenshot(description="需要AI分析", compress=True)
             
             result["success"] = False
             result["method"] = None
-            result["message"] = "❌ 控件树和模板匹配都未找到关闭按钮\n" \
+            result["message"] = "⚠️ 检测到弹窗但未找到关闭按钮\n" \
                                "📸 已截图，请 AI 分析图片中的 X 按钮位置\n" \
                                "💡 找到后使用 mobile_click_by_percent(x%, y%) 点击"
             result["screenshot"] = screenshot_result if not screenshot_path else {"screenshot_path": screenshot_path}
             result["need_ai_analysis"] = True
+            result["popup_detected"] = True
             
             return result
             
