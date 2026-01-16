@@ -2877,9 +2877,6 @@ class BasicMobileToolsLite:
                         # 应用已跳转，说明弹窗去除失败，尝试返回目标应用
                         return_result = self._return_to_target_app()
                     
-                    # 尝试后截图，让 AI 判断是否成功
-                    screenshot_result = self.take_screenshot("尝试关闭后")
-                    
                     msg = f"✅ 已尝试点击常见关闭按钮位置"
                     if app_check['switched']:
                         msg += f"\n⚠️ 应用已跳转，说明弹窗去除失败"
@@ -2893,10 +2890,9 @@ class BasicMobileToolsLite:
                         "success": True,
                         "message": msg,
                         "tried_positions": [p[2] for p in try_positions],
-                        "screenshot": screenshot_result.get("screenshot_path", ""),
                         "app_check": app_check,
                         "return_to_app": return_result,
-                        "tip": "请查看截图确认弹窗是否已关闭。如果还在，可手动分析截图找到关闭按钮位置。"
+                        "tip": "💡 建议调用 mobile_screenshot_with_som 确认弹窗是否已关闭"
                     }
             
             # 按得分排序，取最可能的
@@ -2915,9 +2911,6 @@ class BasicMobileToolsLite:
                 # 应用已跳转，说明弹窗去除失败，尝试返回目标应用
                 return_result = self._return_to_target_app()
             
-            # 点击后截图，让 AI 判断是否成功
-            screenshot_result = self.take_screenshot("关闭弹窗后")
-            
             # 使用标准记录格式
             self._record_click('percent', f"{best['x_percent']}%,{best['y_percent']}%", 
                               best['x_percent'], best['y_percent'],
@@ -2933,8 +2926,6 @@ class BasicMobileToolsLite:
                     else:
                         msg += f"\n❌ 自动返回失败: {return_result['message']}"
             
-            # 返回候选按钮列表，让 AI 看截图判断
-            # 如果弹窗还在，AI 可以选择点击其他候选按钮
             return {
                 "success": True,
                 "message": msg,
@@ -2944,22 +2935,18 @@ class BasicMobileToolsLite:
                     "coords": (best['center_x'], best['center_y']),
                     "percent": (best['x_percent'], best['y_percent'])
                 },
-                "screenshot": screenshot_result.get("screenshot_path", ""),
                 "popup_detected": popup_detected,
-                "popup_confidence": popup_confidence if popup_bounds else 0,
-                "popup_bounds": f"[{popup_bounds[0]},{popup_bounds[1]}][{popup_bounds[2]},{popup_bounds[3]}]" if popup_detected else None,
                 "app_check": app_check,
                 "return_to_app": return_result,
                 "other_candidates": [
                     {
                         "position": c['position'], 
                         "type": c['match_type'], 
-                        "coords": (c['center_x'], c['center_y']),
                         "percent": (c['x_percent'], c['y_percent'])
                     }
-                    for c in close_candidates[1:4]  # 返回其他3个候选，AI 可以选择
+                    for c in close_candidates[1:3]  # 返回其他2个候选
                 ],
-                "tip": "请查看截图判断弹窗是否已关闭。如果弹窗还在，可以尝试点击 other_candidates 中的其他位置"
+                "tip": "💡 建议调用 mobile_screenshot_with_som 确认弹窗是否已关闭"
             }
             
         except Exception as e:
@@ -3964,12 +3951,6 @@ class BasicMobileToolsLite:
                 cx, cy = best['center']
                 bounds = best['bounds']
                 
-                # 点击前截图（用于自动学习）
-                pre_screenshot = None
-                if auto_learn:
-                    pre_result = self.take_screenshot(description="关闭前", compress=False)
-                    pre_screenshot = pre_result.get("screenshot_path")
-                
                 # 点击（click_at_coords 内部已包含应用状态检查和自动返回）
                 click_result = self.click_at_coords(cx, cy)
                 time.sleep(0.5)
@@ -3999,13 +3980,7 @@ class BasicMobileToolsLite:
                 result["message"] = msg
                 result["app_check"] = app_check
                 result["return_to_app"] = return_result
-                
-                # 自动学习：检查这个 X 是否已在模板库，不在就添加
-                if auto_learn and pre_screenshot:
-                    learn_result = self._auto_learn_template(pre_screenshot, bounds)
-                    if learn_result:
-                        result["learned_template"] = learn_result
-                        result["message"] += f"\n📚 自动学习: {learn_result}"
+                result["tip"] = "💡 建议调用 mobile_screenshot_with_som 确认弹窗是否已关闭"
                 
                 return result
             
@@ -4065,19 +4040,14 @@ class BasicMobileToolsLite:
             except Exception:
                 pass  # 模板匹配失败，继续下一步
             
-            # ========== 第3步：确实有弹窗但找不到关闭按钮，返回截图供 AI 分析 ==========
+            # ========== 第3步：确实有弹窗但找不到关闭按钮 ==========
             # 注意：到达这里说明前面已经检测到弹窗（popup_confidence >= 0.5）
-            if not screenshot_path:
-                screenshot_result = self.take_screenshot(description="需要AI分析", compress=True)
-            
             result["success"] = False
             result["method"] = None
-            result["message"] = "⚠️ 检测到弹窗但未找到关闭按钮\n" \
-                               "📸 已截图，请 AI 分析图片中的 X 按钮位置\n" \
-                               "💡 找到后使用 mobile_click_by_percent(x%, y%) 点击"
-            result["screenshot"] = screenshot_result if not screenshot_path else {"screenshot_path": screenshot_path}
+            result["message"] = "⚠️ 检测到弹窗但未找到关闭按钮"
             result["need_ai_analysis"] = True
             result["popup_detected"] = True
+            result["tip"] = "💡 请调用 mobile_screenshot_with_som 截图分析，找到 X 按钮后点击"
             
             return result
             
