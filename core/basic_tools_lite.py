@@ -1242,13 +1242,11 @@ class BasicMobileToolsLite:
                         # 使用标准记录格式
                         self._record_click('text', text, element_desc=text, locator_attr='text')
                         return {"success": True, "message": f"✅ 点击成功: '{text}'"}
-                    # 控件树找不到，降级到视觉识别
-                    som_result = self.take_screenshot_with_som()
+                    # 控件树找不到，提示 AI 使用视觉识别（不自动截图，节省 token）
                     return {
                         "success": False,
                         "fallback": "vision",
-                        "message": f"控件树未找到文本 '{text}'，请查看截图用 click_by_som 点击",
-                        "som_screenshot": som_result
+                        "message": f"控件树未找到文本 '{text}'，请调用 mobile_screenshot_with_som 截图后用 click_by_som 点击"
                     }
                 else:
                     return {"success": False, "message": "❌ iOS 客户端未初始化"}
@@ -1317,13 +1315,11 @@ class BasicMobileToolsLite:
                                           element_desc=f"{text}{position_info}")
                         return {"success": True, "message": f"✅ 点击成功(坐标兜底): '{text}'{position_info} @ ({x},{y})"}
                 
-                # 控件树找不到，降级到视觉识别 - 返回 SoM 截图供 AI 分析
-                som_result = self.take_screenshot_with_som()
+                # 控件树找不到，提示 AI 使用视觉识别（不自动截图，节省 token）
                 return {
                     "success": False,
                     "fallback": "vision",
-                    "message": f"控件树未找到文本 '{text}'，请查看截图用 click_by_som 点击",
-                    "som_screenshot": som_result
+                    "message": f"控件树未找到文本 '{text}'，请调用 mobile_screenshot_with_som 截图后用 click_by_som 点击"
                 }
         except Exception as e:
             return {"success": False, "message": f"❌ 点击失败: {e}"}
@@ -1491,13 +1487,11 @@ class BasicMobileToolsLite:
                             return {"success": True, "message": f"✅ 点击成功: {resource_id}{index_desc}"}
                         else:
                             return {"success": False, "message": f"❌ 索引超出范围: 找到 {len(elements)} 个元素，但请求索引 {index}"}
-                    # 控件树找不到，降级到视觉识别
-                    som_result = self.take_screenshot_with_som()
+                    # 控件树找不到，提示 AI 使用视觉识别（不自动截图，节省 token）
                     return {
                         "success": False,
                         "fallback": "vision",
-                        "message": f"控件树未找到 ID '{resource_id}'，请查看截图用 click_by_som 点击",
-                        "som_screenshot": som_result
+                        "message": f"控件树未找到 ID '{resource_id}'，请调用 mobile_screenshot_with_som 截图后用 click_by_som 点击"
                     }
                 else:
                     return {"success": False, "message": "❌ iOS 客户端未初始化"}
@@ -1515,13 +1509,11 @@ class BasicMobileToolsLite:
                     else:
                         return {"success": False, "message": f"❌ 索引超出范围: 找到 {count} 个元素，但请求索引 {index}"}
                 
-                # 控件树找不到，降级到视觉识别 - 返回 SoM 截图供 AI 分析
-                som_result = self.take_screenshot_with_som()
+                # 控件树找不到，提示 AI 使用视觉识别（不自动截图，节省 token）
                 return {
                     "success": False,
                     "fallback": "vision",
-                    "message": f"控件树未找到 ID '{resource_id}'，请查看截图用 click_by_som 点击",
-                    "som_screenshot": som_result
+                    "message": f"控件树未找到 ID '{resource_id}'，请调用 mobile_screenshot_with_som 截图后用 click_by_som 点击"
                 }
         except Exception as e:
             return {"success": False, "message": f"❌ 点击失败: {e}"}
@@ -2858,27 +2850,21 @@ class BasicMobileToolsLite:
                 pass
             
             if not close_candidates:
-                # 控件树找不到，优先截图让 AI 分析（而不是盲点）
+                # 控件树找不到，提示 AI 使用视觉识别（不自动截图，节省 token）
                 if popup_detected and popup_bounds:
-                    # 截图供 AI 视觉分析
-                    screenshot_result = self.take_screenshot_with_som()
-                    if screenshot_result.get("success"):
-                        return {
-                            "success": False,
-                            "message": "⚠️ 控件树未找到关闭按钮，请查看 SoM 截图分析",
-                            "need_ai_click": True,
-                            "popup_detected": True,
-                            "popup_bounds": f"[{popup_bounds[0]},{popup_bounds[1]}][{popup_bounds[2]},{popup_bounds[3]}]",
-                            "screenshot": screenshot_result,
-                            "tip": "💡 请在截图中找到 X 按钮编号，使用 mobile_click_by_som(编号) 点击"
-                        }
+                    return {
+                        "success": False,
+                        "fallback": "vision",
+                        "message": "⚠️ 控件树未找到关闭按钮，请调用 mobile_screenshot_with_som 截图后用 click_by_som 点击",
+                        "popup_detected": True,
+                        "popup_bounds": f"[{popup_bounds[0]},{popup_bounds[1]}][{popup_bounds[2]},{popup_bounds[3]}]"
+                    }
                 
-                # 没有检测到弹窗，或截图失败，返回无弹窗
+                # 没有检测到弹窗
                 return {
                     "success": True,
-                    "message": "ℹ️ 未找到关闭按钮",
-                    "popup_detected": popup_detected,
-                    "close_candidates": []
+                    "message": "ℹ️ 未检测到弹窗",
+                    "popup_detected": popup_detected
                 }
             
             # 按得分排序，取最可能的
@@ -3970,23 +3956,7 @@ class BasicMobileToolsLite:
                 
                 return result
             
-            # ========== 第2步：截图供 AI 视觉分析（推荐）==========
-            # 优先让 AI 分析截图，因为 AI 视觉能力更强
-            screenshot_result = self.take_screenshot_with_som()
-            if screenshot_result.get("success"):
-                result["success"] = False  # 需要 AI 继续操作
-                result["method"] = "AI视觉"
-                result["need_ai_click"] = True
-                result["popup_detected"] = True
-                result["screenshot"] = screenshot_result
-                result["message"] = (
-                    "⚠️ 控件树未找到关闭按钮，请查看 SoM 截图\n"
-                    "📸 截图已标注元素编号，请找到 X 按钮对应的编号\n"
-                    "💡 使用 mobile_click_by_som(编号) 点击关闭"
-                )
-                return result
-            
-            # ========== 第3步：模板匹配（兜底）==========
+            # ========== 第2步：模板匹配（自动执行，不需要 AI 介入）==========
             screenshot_path = None
             try:
                 from .template_matcher import TemplateMatcher
@@ -4037,12 +4007,12 @@ class BasicMobileToolsLite:
             except Exception:
                 pass  # 模板匹配失败，继续下一步
             
-            # ========== 第4步：都失败了 ==========
+            # ========== 第3步：控件树和模板匹配都失败，提示 AI 使用视觉识别 ==========
             result["success"] = False
+            result["fallback"] = "vision"
             result["method"] = None
-            result["message"] = "⚠️ 检测到弹窗但所有方法都未能找到关闭按钮"
             result["popup_detected"] = True
-            result["tip"] = "💡 请手动截图分析或使用 mobile_click_by_percent 点击"
+            result["message"] = "⚠️ 控件树和模板匹配都未找到关闭按钮，请调用 mobile_screenshot_with_som 截图后用 click_by_som 点击"
             
             return result
             
