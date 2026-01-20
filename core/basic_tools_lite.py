@@ -2197,6 +2197,13 @@ class BasicMobileToolsLite:
     def wait(self, seconds: float) -> Dict:
         """等待指定时间"""
         time.sleep(seconds)
+        # 记录等待操作
+        record = {
+            'action': 'wait',
+            'timestamp': datetime.now().isoformat(),
+            'seconds': seconds,
+        }
+        self.operation_history.append(record)
         return {"success": True}
     
     # ==================== 应用管理 ====================
@@ -2353,6 +2360,15 @@ class BasicMobileToolsLite:
                     '_shadow', 'shadow_', '_divider', 'divider_', '_line', 'line_'
                 }
                 
+                # 状态栏相关关键词（这些元素对测试没有意义，直接过滤）
+                STATUS_BAR_KEYWORDS = {
+                    'status_bar', 'statusbar', 'notification_icon', 'notificationicons',
+                    'system_icons', 'statusicons', 'battery', 'wifi_', 'wifi_combo',
+                    'wifi_group', 'wifi_signal', 'wifi_in', 'wifi_out', 'signal_',
+                    'clock', 'cutout', 'networkspeed', 'speed_container',
+                    'carrier', 'operator', 'sim_', 'mobile_signal'
+                }
+                
                 # Token 优化：构建精简元素（只返回非空字段）
                 def build_compact_element(resource_id, text, content_desc, bounds, likely_click, class_name):
                     """只返回有值的字段，节省 token"""
@@ -2389,6 +2405,12 @@ class BasicMobileToolsLite:
                     # 1. 过滤 bounds="[0,0][0,0]" 的视觉隐藏元素
                     if bounds == '[0,0][0,0]':
                         continue
+                    
+                    # 1.5 过滤状态栏元素（对测试没有意义）
+                    if resource_id:
+                        resource_id_lower = resource_id.lower()
+                        if any(keyword in resource_id_lower for keyword in STATUS_BAR_KEYWORDS):
+                            continue
                     
                     # 2. 检查是否是功能控件（直接保留）
                     if class_name in FUNCTIONAL_WIDGETS:
@@ -3379,6 +3401,15 @@ class BasicMobileToolsLite:
         
         # 生成脚本
         safe_name = re.sub(r'[^\w\s-]', '', test_name).strip().replace(' ', '_')
+        # 确保 safe_name 不为空，否则使用默认名称
+        if not safe_name:
+            safe_name = 'generated_case'
+        
+        # 提前处理文件名，确保文档字符串中的文件名正确
+        if not filename.endswith('.py'):
+            filename = f"{filename}.py"
+        if not filename.startswith('test_'):
+            filename = f"test_{filename}"
         
         script_lines = [
             "#!/usr/bin/env python3",
@@ -3393,8 +3424,8 @@ class BasicMobileToolsLite:
             "3. 百分比定位 - 跨分辨率兼容（坐标自动转换）",
             "",
             "运行方式：",
-            "  pytest {filename} -v        # 使用 pytest 运行",
-            "  python {filename}           # 直接运行",
+            f"  pytest {filename} -v        # 使用 pytest 运行",
+            f"  python {filename}           # 直接运行",
             f'"""',
             "import time",
             "import pytest",
@@ -3655,6 +3686,12 @@ class BasicMobileToolsLite:
                 script_lines.append(f"    d.press('{key}')")
                 script_lines.append("    time.sleep(0.5)")
                 script_lines.append("    ")
+            
+            elif action == 'wait':
+                seconds = op.get('seconds', 1)
+                script_lines.append(f"    # 步骤{step_num}: 等待 {seconds} 秒")
+                script_lines.append(f"    time.sleep({seconds})")
+                script_lines.append("    ")
         
         script_lines.extend([
             "    print('✅ 测试完成')",
@@ -3677,12 +3714,6 @@ class BasicMobileToolsLite:
         # 保存文件
         output_dir = Path("tests")
         output_dir.mkdir(exist_ok=True)
-        
-        # 确保文件名符合 pytest 规范（以 test_ 开头）
-        if not filename.endswith('.py'):
-            filename = f"{filename}.py"
-        if not filename.startswith('test_'):
-            filename = f"test_{filename}"
         
         file_path = output_dir / filename
         file_path.write_text(script, encoding='utf-8')
