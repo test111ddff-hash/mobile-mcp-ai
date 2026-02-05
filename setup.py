@@ -25,7 +25,7 @@ if requirements_file.exists():
 
 setup(
     name="mobile-mcp-ai",
-    version="2.7.12",  # 新增 hide_keyboard 工具，用于登录场景收起键盘确保协议复选框可点击
+    version="2.7.13",  # 新增通用模板匹配功能 (mobile_template_match_and_click)
     author="douzi",
     author_email="1492994674@qq.com",
     description="移动端自动化 MCP Server - 支持 Android/iOS，AI 功能可选（基础工具不需要 AI）",
@@ -67,6 +67,8 @@ setup(
         "Pillow>=10.0.0",
         "mcp>=0.9.0",
         "python-dotenv>=1.0.0",  # 用于读取 .env 配置
+        "opencv-python>=4.0.0",   # 模板匹配需要
+        "numpy>=1.0.0",          # 模板匹配需要
     ],
     extras_require={
         # AI 功能（可选）- 智能工具需要
@@ -117,6 +119,8 @@ setup(
             'pyautogui>=0.9.0',
             'pyperclip>=1.8.0',
             'pygetwindow>=0.0.9',
+            'opencv-python>=4.0.0',
+            'numpy>=1.0.0',
         ],
     },
     entry_points={
@@ -139,7 +143,7 @@ setup(
     zip_safe=False,
     # 包含模板图片到包内
     package_data={
-        'mobile_mcp.core': ['templates/close_buttons/*.png'],
+        'mobile_mcp.core': ['templates/**/*.png'],
     },
 )
 

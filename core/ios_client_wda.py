@@ -18,7 +18,7 @@ import sys
 import time
 from typing import Dict, Optional, List
 
-from .ios_device_manager_wda import IOSDeviceManagerWDA
+from core.ios_device_manager_wda import IOSDeviceManagerWDA
 
 
 class IOSClientWDA:

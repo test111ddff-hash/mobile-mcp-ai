@@ -213,8 +213,10 @@ generate_test_script(
 1. screenshot_with_som()  # SoM 标注截图
 2. click_by_som(编号)  # 点击 X 号对应的编号
 
-# 学习新的 X 按钮模板
-template_add(template_name="app_x_button", x_percent=95, y_percent=8, size=60)
+# 学习新的模板（不仅仅是X按钮）
+template_add(template_name="checkbox_checked", category="checkbox")
+# 识别并点击
+template_match_and_click(template_name="checkbox_checked", category="checkbox")
 ```
 
 ---
@@ -320,6 +322,7 @@ check_connection()
 - `close_ad` - 🚫 关闭广告
 - `find_close_button` - 🔍 查找关闭按钮
 - `template_close` - 🎯 模板匹配关闭
+- `template_match_and_click` - 🎯 通用模板匹配并点击
 
 ### 验证断言
 - `assert_text` - ✅ 断言文本存在

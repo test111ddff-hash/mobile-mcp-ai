@@ -27,9 +27,9 @@ class TemplateMatcher:
             # 默认模板目录：优先使用包内目录，其次使用项目根目录
             core_dir = Path(__file__).parent
             # 1. 包内目录 (pip 安装后)
-            pkg_template_dir = core_dir / "templates" / "close_buttons"
+            pkg_template_dir = core_dir / "templates"
             # 2. 项目根目录 (开发时)
-            root_template_dir = core_dir.parent / "templates" / "close_buttons"
+            root_template_dir = core_dir.parent / "templates"
             
             if pkg_template_dir.exists():
                 self.template_dir = pkg_template_dir
@@ -53,9 +53,12 @@ class TemplateMatcher:
         # 缓存加载的模板
         self._template_cache: Dict[str, np.ndarray] = {}
     
-    def load_templates(self) -> List[Tuple[str, np.ndarray]]:
+    def load_templates(self, category: Optional[str] = None) -> List[Tuple[str, np.ndarray]]:
         """
-        加载所有模板图片
+        加载模板图片
+        
+        Args:
+            category: 模板分类子目录 (e.g., "close_buttons")，如果不传则加载所有
         
         Returns:
             List of (template_name, template_image) tuples
@@ -64,13 +67,32 @@ class TemplateMatcher:
         
         if not self.template_dir.exists():
             return templates
+            
+        # 确定搜索目录
+        if category:
+            search_dir = self.template_dir / category
+            if not search_dir.exists():
+                return templates
+        else:
+            search_dir = self.template_dir
         
         # 支持的图片格式
         extensions = ['.png', '.jpg', '.jpeg', '.bmp']
         
-        for file in self.template_dir.iterdir():
+        # 递归搜索 (如果是根目录) 或 仅搜索指定目录
+        if category:
+            iterator = search_dir.iterdir()
+        else:
+            iterator = search_dir.rglob("*")
+            
+        for file in iterator:
+            if not file.is_file():
+                continue
+                
             if file.suffix.lower() in extensions:
-                template_name = file.stem
+                # 模板名称包含相对路径以避免重名，例如 "close_buttons/x_circle"
+                rel_path = file.relative_to(self.template_dir)
+                template_name = str(rel_path.with_suffix('')).replace(os.path.sep, '_')
                 
                 # 使用缓存
                 if template_name in self._template_cache:
@@ -207,6 +229,92 @@ class TemplateMatcher:
         
         return kept
     
+    def match_all_templates(
+        self, 
+        screenshot_path: str,
+        category: Optional[str] = None,
+        threshold: Optional[float] = None
+    ) -> Dict:
+        """
+        在截图中匹配所有模板
+        
+        Args:
+            screenshot_path: 截图路径
+            category: 模板分类 (可选)
+            threshold: 匹配阈值 (0-1)
+            
+        Returns:
+            匹配结果
+        """
+        # 读取截图
+        screenshot = cv2.imread(screenshot_path)
+        if screenshot is None:
+            return {
+                "success": False,
+                "error": f"无法读取截图: {screenshot_path}"
+            }
+        
+        img_height, img_width = screenshot.shape[:2]
+        
+        # 加载模板
+        templates = self.load_templates(category=category)
+        if not templates:
+            return {
+                "success": False,
+                "error": f"没有找到模板图片 (Category: {category})",
+                "template_dir": str(self.template_dir),
+            }
+        
+        all_matches = []
+        
+        for template_name, template in templates:
+            matches = self.match_single_template(screenshot, template, threshold)
+            for match in matches:
+                match['template'] = template_name
+                all_matches.append(match)
+        
+        # 按置信度排序
+        all_matches = sorted(all_matches, key=lambda x: x['confidence'], reverse=True)
+        
+        # 再次 NMS 去除不同模板的重复检测
+        all_matches = self._non_max_suppression(all_matches)
+        
+        if not all_matches:
+            return {
+                "success": False,
+                "message": "未找到匹配的模板",
+                "threshold": threshold or self.match_threshold
+            }
+        
+        # 计算百分比坐标
+        for match in all_matches:
+            match['x_percent'] = round(match['x'] / img_width * 100, 1)
+            match['y_percent'] = round(match['y'] / img_height * 100, 1)
+        
+        best = all_matches[0]
+        
+        return {
+            "success": True,
+            "message": f"✅ 找到 {len(all_matches)} 个匹配目标",
+            "best_match": {
+                "template": best['template'],
+                "center": {"x": int(best['x']), "y": int(best['y'])},
+                "percent": {"x": float(best['x_percent']), "y": float(best['y_percent'])},
+                "size": f"{best['width']}x{best['height']}",
+                "confidence": float(round(best['confidence'] * 100, 1))
+            },
+            "click_command": f"mobile_click_by_percent({best['x_percent']}, {best['y_percent']})",
+            "all_matches": [
+                {
+                    "template": m['template'],
+                    "percent": f"({m['x_percent']}%, {m['y_percent']}%)",
+                    "confidence": f"{m['confidence']*100:.1f}%"
+                }
+                for m in all_matches[:10]
+            ],
+            "image_size": {"width": img_width, "height": img_height}
+        }
+    
     def find_close_buttons(
         self, 
         screenshot_path: str,
@@ -233,13 +341,13 @@ class TemplateMatcher:
         img_height, img_width = screenshot.shape[:2]
         
         # 加载模板
-        templates = self.load_templates()
+        templates = self.load_templates(category="close_buttons")
         if not templates:
             return {
                 "success": False,
                 "error": "没有找到模板图片，请在 templates/close_buttons/ 目录添加X号模板",
-                "template_dir": str(self.template_dir),
-                "tip": "添加常见X号截图到模板目录，命名如 x_circle.png, x_white.png 等"
+                "template_dir": str(self.template_dir / "close_buttons"),
+                "tip": "添加常见X号截图到 templates/close_buttons/ 目录，命名如 x_circle.png, x_white.png 等"
             }
         
         all_matches = []
@@ -294,13 +402,14 @@ class TemplateMatcher:
             "image_size": {"width": img_width, "height": img_height}
         }
     
-    def add_template(self, image_path: str, template_name: str) -> Dict:
+    def add_template(self, image_path: str, template_name: str, category: str = "close_buttons") -> Dict:
         """
         添加新模板到模板库
         
         Args:
             image_path: 图片路径（可以是截图的一部分）
             template_name: 模板名称
+            category: 模板分类（子目录），默认为 "close_buttons"
             
         Returns:
             结果
@@ -310,8 +419,12 @@ class TemplateMatcher:
         if img is None:
             return {"success": False, "error": f"无法读取图片: {image_path}"}
         
+        # 确定保存目录
+        save_dir = self.template_dir / category
+        save_dir.mkdir(parents=True, exist_ok=True)
+        
         # 保存到模板目录
-        output_path = self.template_dir / f"{template_name}.png"
+        output_path = save_dir / f"{template_name}.png"
         cv2.imwrite(str(output_path), img)
         
         # 清除缓存
@@ -320,7 +433,8 @@ class TemplateMatcher:
         return {
             "success": True,
             "message": f"✅ 模板已保存: {output_path}",
-            "template_name": template_name
+            "template_name": template_name,
+            "category": category
         }
     
     def crop_and_add_template(
@@ -328,7 +442,8 @@ class TemplateMatcher:
         screenshot_path: str, 
         x: int, y: int, 
         width: int, height: int,
-        template_name: str
+        template_name: str,
+        category: str = "close_buttons"
     ) -> Dict:
         """
         从截图中裁剪区域并添加为模板
@@ -338,6 +453,7 @@ class TemplateMatcher:
             x, y: 左上角坐标
             width, height: 裁剪尺寸
             template_name: 模板名称
+            category: 模板分类（子目录），默认为 "close_buttons"
             
         Returns:
             结果
@@ -352,8 +468,12 @@ class TemplateMatcher:
         if cropped.size == 0:
             return {"success": False, "error": "裁剪区域无效"}
         
+        # 确定保存目录
+        save_dir = self.template_dir / category
+        save_dir.mkdir(parents=True, exist_ok=True)
+        
         # 保存
-        output_path = self.template_dir / f"{template_name}.png"
+        output_path = save_dir / f"{template_name}.png"
         cv2.imwrite(str(output_path), cropped)
         
         # 清除缓存
@@ -366,15 +486,15 @@ class TemplateMatcher:
             "size": f"{width}x{height}"
         }
     
-    def list_templates(self) -> Dict:
+    def list_templates(self, category: Optional[str] = None) -> Dict:
         """列出所有模板"""
-        templates = self.load_templates()
+        templates = self.load_templates(category=category)
         
         if not templates:
             return {
                 "success": True,
                 "templates": [],
-                "message": "模板库为空",
+                "message": "模板库为空" + (f" (Category: {category})" if category else ""),
                 "template_dir": str(self.template_dir)
             }
         

@@ -392,7 +392,9 @@ pip install pyautogui pyperclip pygetwindow
 | 🚫 | `mobile_close_popup` | 关闭弹窗 |
 | 🚫 | `mobile_close_ad` | 智能关闭广告弹窗 |
 | 🎯 | `mobile_template_close` | 模板匹配关闭弹窗 |
-| ➕ | `mobile_template_add` | 添加 X 号模板 |
+| 🎯 | `mobile_template_match` | 通用模板匹配 |
+| 🎯 | `mobile_template_match_and_click` | 通用模板匹配并点击 |
+| ➕ | `mobile_template_add` | 添加模板（支持分类） |
 | ✅ | `mobile_assert_text` | 断言文本 |
 | 📜 | `mobile_get_operation_history` | 操作历史 |
 | 🗑️ | `mobile_clear_operation_history` | 清空历史 |

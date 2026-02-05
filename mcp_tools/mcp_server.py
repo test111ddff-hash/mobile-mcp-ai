@@ -855,11 +855,12 @@ class MobileMCPServer:
         
         tools.append(Tool(
             name="mobile_template_add",
-            description="➕ 添加X号模板。",
+            description="➕ 添加图像模板（X号/复选框/图标等）。",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "template_name": {"type": "string", "description": "模板名"},
+                    "category": {"type": "string", "description": "分类(如 close_buttons, checkbox)", "default": "close_buttons"},
                     "x_percent": {"type": "number", "description": "X百分比"},
                     "y_percent": {"type": "number", "description": "Y百分比"},
                     "size": {"type": "integer", "description": "裁剪大小(px)"},
@@ -870,6 +871,34 @@ class MobileMCPServer:
                     "height": {"type": "integer", "description": "高"}
                 },
                 "required": ["template_name"]
+            }
+        ))
+        
+        tools.append(Tool(
+            name="mobile_template_match",
+            description="🔍 模板匹配（只识别不点击）。",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "template_name": {"type": "string", "description": "指定模板名(可选)"},
+                    "category": {"type": "string", "description": "分类(可选)"},
+                    "threshold": {"type": "number", "description": "阈值0-1"}
+                },
+                "required": []
+            }
+        ))
+
+        tools.append(Tool(
+            name="mobile_template_match_and_click",
+            description="🎯 模板匹配并点击。",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "template_name": {"type": "string", "description": "指定模板名(可选)"},
+                    "category": {"type": "string", "description": "分类(可选)"},
+                    "threshold": {"type": "number", "description": "阈值0-1"}
+                },
+                "required": []
             }
         ))
         
@@ -1152,6 +1181,7 @@ class MobileMCPServer:
             
             elif name == "mobile_template_add":
                 template_name = arguments["template_name"]
+                category = arguments.get("category", "close_buttons")
                 # 判断使用哪种方式
                 if "x_percent" in arguments and "y_percent" in arguments:
                     # 百分比方式
@@ -1159,7 +1189,8 @@ class MobileMCPServer:
                         arguments["x_percent"],
                         arguments["y_percent"],
                         arguments.get("size", 80),
-                        template_name
+                        template_name,
+                        category=category
                     )
                 elif "screenshot_path" in arguments:
                     # 像素方式
@@ -1169,10 +1200,27 @@ class MobileMCPServer:
                         arguments["y"],
                         arguments["width"],
                         arguments["height"],
-                        template_name
+                        template_name,
+                        category=category
                     )
                 else:
                     result = {"success": False, "error": "请提供 x_percent/y_percent 或 screenshot_path/x/y/width/height"}
+                return [TextContent(type="text", text=self.format_response(result))]
+
+            elif name == "mobile_template_match":
+                result = self.tools.template_match(
+                    template_name=arguments.get("template_name"),
+                    category=arguments.get("category"),
+                    threshold=arguments.get("threshold", 0.75)
+                )
+                return [TextContent(type="text", text=self.format_response(result))]
+
+            elif name == "mobile_template_match_and_click":
+                result = self.tools.template_match_and_click(
+                    template_name=arguments.get("template_name"),
+                    category=arguments.get("category"),
+                    threshold=arguments.get("threshold", 0.75)
+                )
                 return [TextContent(type="text", text=self.format_response(result))]
             
             # Cursor 会话管理

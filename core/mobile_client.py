@@ -19,11 +19,11 @@ import sys
 import time
 from typing import Dict, Optional, List
 
-from .device_manager import DeviceManager
-from ..utils.xml_parser import XMLParser
-from ..utils.xml_formatter import XMLFormatter
-from .utils.smart_wait import SmartWait
-from .dynamic_config import DynamicConfig
+from core.device_manager import DeviceManager
+from utils.xml_parser import XMLParser
+from utils.xml_formatter import XMLFormatter
+from core.utils.smart_wait import SmartWait
+from core.dynamic_config import DynamicConfig
 
 
 class MobileClient:

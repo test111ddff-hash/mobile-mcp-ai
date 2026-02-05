@@ -4444,6 +4444,103 @@ class BasicMobileToolsLite:
         }
 
     # ========== 模板匹配功能 ==========
+
+    def template_match(self, template_name: Optional[str] = None, category: Optional[str] = None, screenshot_path: Optional[str] = None, threshold: float = 0.75) -> Dict:
+        """通用模板匹配
+        
+        Args:
+            template_name: 模板名称 (可选，精确匹配)
+            category: 模板分类 (可选)
+            screenshot_path: 截图路径 (可选)
+            threshold: 阈值
+            
+        Returns:
+            匹配结果
+        """
+        try:
+            from .template_matcher import TemplateMatcher
+            
+            if screenshot_path is None:
+                screenshot_result = self.take_screenshot(description="模板匹配", compress=False)
+                screenshot_path = screenshot_result.get("screenshot_path")
+                if not screenshot_path:
+                    return {"success": False, "error": "截图失败"}
+            
+            matcher = TemplateMatcher()
+            
+            # 使用 match_all_templates 匹配所有符合条件的
+            result = matcher.match_all_templates(screenshot_path, category=category, threshold=threshold)
+            
+            if not result["success"]:
+                return result
+                
+            # 如果指定了 template_name，进行过滤
+            if template_name:
+                # 1. 尝试精确匹配 (e.g., "checkbox_checked")
+                filtered_matches = [m for m in result.get("all_matches", []) if m['template'] == template_name]
+                
+                # 2. 如果没找到，且指定了 category，尝试组合匹配 (e.g., "checked" -> "checkbox_checked")
+                if not filtered_matches and category:
+                    full_name = f"{category}_{template_name}"
+                    filtered_matches = [m for m in result.get("all_matches", []) if m['template'] == full_name]
+                
+                if not filtered_matches:
+                    err_msg = f"未找到名为 {template_name}"
+                    if category:
+                        err_msg += f" 或 {category}_{template_name}"
+                    err_msg += " 的匹配项"
+                    return {"success": False, "error": err_msg}
+                
+                # 重新计算 best_match
+                best = filtered_matches[0] # all_matches 已经是按置信度排序的
+                 # 构造返回结果 (复用 matcher 的格式)
+                result["message"] = f"✅ 找到 {len(filtered_matches)} 个匹配目标 ({template_name})"
+                result["best_match"] = {
+                    "template": best['template'],
+                    "center": {"x": int(best['x']), "y": int(best['y'])},
+                    "percent": {"x": float(best['x_percent']), "y": float(best['y_percent'])},
+                    "size": f"{best['width']}x{best['height']}",
+                    "confidence": float(round(best['confidence'] * 100, 1))
+                }
+                result["click_command"] = f"mobile_click_by_percent({best['x_percent']}, {best['y_percent']})"
+                result["all_matches"] = filtered_matches
+            
+            return result
+
+        except ImportError:
+            return {"success": False, "error": "需要安装 opencv-python"}
+        except Exception as e:
+            return {"success": False, "error": f"模板匹配失败: {e}"}
+
+    def template_match_and_click(self, template_name: Optional[str] = None, category: Optional[str] = None, threshold: float = 0.75) -> Dict:
+        """通用模板匹配并点击
+        
+        Args:
+            template_name: 模板名称 (可选)
+            category: 模板分类 (可选)
+            threshold: 阈值
+        """
+        match_result = self.template_match(template_name, category, threshold=threshold)
+        
+        if not match_result.get("success"):
+            return match_result
+            
+        best = match_result.get("best_match", {})
+        x_pct = best.get("percent", {}).get("x")
+        y_pct = best.get("percent", {}).get("y")
+        
+        if x_pct is None:
+             return {"success": False, "error": "无法获取匹配坐标"}
+             
+        click_result = self.click_by_percent(x_pct, y_pct)
+        
+        return {
+            "success": True,
+            "message": f"✅ 模板匹配并点击成功 ({best.get('template')})",
+            "matched_template": best.get("template"),
+            "location": f"({x_pct}%, {y_pct}%)",
+            "click_result": click_result
+        }
     
     def template_match_close(self, screenshot_path: Optional[str] = None, threshold: float = 0.75) -> Dict:
         """使用模板匹配查找关闭按钮
@@ -4523,7 +4620,7 @@ class BasicMobileToolsLite:
             return {"success": False, "error": f"模板点击失败: {e}"}
     
     def template_add(self, screenshot_path: str, x: int, y: int, 
-                     width: int, height: int, template_name: str) -> Dict:
+                     width: int, height: int, template_name: str, category: str = "close_buttons") -> Dict:
         """从截图中裁剪并添加新模板
         
         当遇到新样式的X号时，用此方法添加到模板库。
@@ -4533,6 +4630,7 @@ class BasicMobileToolsLite:
             x, y: 裁剪区域左上角坐标
             width, height: 裁剪区域大小
             template_name: 模板名称（如 x_circle_gray）
+            category: 模板分类
             
         Returns:
             结果
@@ -4542,20 +4640,53 @@ class BasicMobileToolsLite:
             
             matcher = TemplateMatcher()
             return matcher.crop_and_add_template(
-                screenshot_path, x, y, width, height, template_name
+                screenshot_path, x, y, width, height, template_name, category=category
             )
         except ImportError:
             return {"success": False, "error": "需要安装 opencv-python"}
         except Exception as e:
             return {"success": False, "error": f"添加模板失败: {e}"}
+
+    def template_add_by_percent(self, x_percent: float, y_percent: float, size_px: int, template_name: str, category: str = "close_buttons") -> Dict:
+        """添加模板（按百分比位置）
+        
+        Args:
+            x_percent: X百分比
+            y_percent: Y百分比
+            size_px: 裁剪大小(px)
+            template_name: 模板名
+            category: 分类
+        """
+        # 先截图
+        screenshot_result = self.take_screenshot(description="添加模板", compress=False)
+        screenshot_path = screenshot_result.get("screenshot_path")
+        if not screenshot_path:
+            return {"success": False, "error": "截图失败"}
+            
+        img_width = screenshot_result.get("image_width")
+        img_height = screenshot_result.get("image_height")
+        
+        # 计算像素坐标
+        cx = int(img_width * x_percent / 100)
+        cy = int(img_height * y_percent / 100)
+        
+        # 计算左上角和宽高
+        half = size_px // 2
+        x = max(0, cx - half)
+        y = max(0, cy - half)
+        
+        return self.template_add(screenshot_path, x, y, size_px, size_px, template_name, category=category)
     
-    def template_list(self) -> Dict:
-        """列出所有关闭按钮模板"""
+    def template_list(self, category: Optional[str] = None) -> Dict:
+        """列出模板
+        Args:
+            category: 模板分类 (可选)
+        """
         try:
             from .template_matcher import TemplateMatcher
             
             matcher = TemplateMatcher()
-            return matcher.list_templates()
+            return matcher.list_templates(category=category)
         except ImportError:
             return {"success": False, "error": "需要安装 opencv-python"}
         except Exception as e:
