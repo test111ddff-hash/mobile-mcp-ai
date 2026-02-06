@@ -1,5 +1,5 @@
 """
-Forwarder module so that `from mobile_mcp.core.mobile_client import MobileClient`
+Forwarder module so that `from mobile_mcp.core.device_manager import DeviceManager`
 works when running from source.
 """
 
@@ -17,7 +17,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 def _load_impl():
     """
-    Load the real `core.mobile_client` module and return its MobileClient.
+    Load the real `core.device_manager` module and return its DeviceManager.
 
     We need to ensure the core package is properly set up for relative imports.
     """
@@ -30,20 +30,19 @@ def _load_impl():
         if spec.loader is not None:
             spec.loader.exec_module(core_module)
     
-    # Now load mobile_client as part of the core package
-    impl_path = _PROJECT_ROOT / "core" / "mobile_client.py"
+    # Now load device_manager as part of the core package
+    impl_path = _PROJECT_ROOT / "core" / "device_manager.py"
     spec = importlib.util.spec_from_file_location(
-        "core.mobile_client", impl_path
+        "core.device_manager", impl_path
     )
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     assert spec.loader is not None
     spec.loader.exec_module(module)
-    return module.MobileClient
+    return module.DeviceManager
 
 
-MobileClient = _load_impl()
+DeviceManager = _load_impl()
 
-__all__ = ["MobileClient"]
-
+__all__ = ["DeviceManager"]
 

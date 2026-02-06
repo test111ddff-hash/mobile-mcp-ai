@@ -40,8 +40,8 @@ class DeviceManager:
             self.current_device_id = None
         elif platform == "ios":
             # iOS设备管理器（延迟导入）
-            from .ios_device_manager import IOSDeviceManager
-            self.ios_manager = IOSDeviceManager()
+            from .ios_device_manager_wda import IOSDeviceManagerWDA
+            self.ios_manager = IOSDeviceManagerWDA()
             self.driver = None
             self.current_device_id = None
         else:
