@@ -735,8 +735,49 @@ class BasicMobileToolsLite:
             # 第2步：获取所有可点击元素
             elements = []
             if self._is_ios():
-                # iOS 暂不支持
-                pass
+                # iOS 使用专门的实现
+                ios_client = self._get_ios_client()
+                if ios_client and hasattr(ios_client, 'list_elements'):
+                    ios_elements = ios_client.list_elements()
+                    for elem in ios_elements:
+                        bounds_str = elem.get('bounds', '')
+                        name = elem.get('name', '')
+                        label = elem.get('label', '')
+                        value = elem.get('value', '')
+                        elem_type = elem.get('type', '')
+                        
+                        if not bounds_str:
+                            continue
+                        
+                        match = re.match(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', bounds_str)
+                        if not match:
+                            continue
+                        
+                        x1, y1, x2, y2 = map(int, match.groups())
+                        width = x2 - x1
+                        height = y2 - y1
+                        
+                        # 过滤太小或太大的元素
+                        if width < 20 or height < 20:
+                            continue
+                        if width >= screen_width * 0.98 and height >= screen_height * 0.5:
+                            continue
+                        
+                        center_x = (x1 + x2) // 2
+                        center_y = (y1 + y2) // 2
+                        
+                        # 生成描述
+                        desc = name or label or value or elem_type.replace('XCUIElementType', '')
+                        if len(desc) > 20:
+                            desc = desc[:17] + "..."
+                        
+                        elements.append({
+                            'bounds': (x1, y1, x2, y2),
+                            'center': (center_x, center_y),
+                            'text': name or label or value,
+                            'desc': desc,
+                            'resource_id': ''
+                        })
             else:
                 try:
                     import xml.etree.ElementTree as ET
@@ -1107,7 +1148,10 @@ class BasicMobileToolsLite:
             # 执行点击
             if self._is_ios():
                 ios_client = self._get_ios_client()
-                ios_client.wda.click(x, y)
+                if ios_client and hasattr(ios_client, 'wda'):
+                    ios_client.wda.click(x, y)
+                else:
+                    return {"success": False, "message": "❌ iOS 客户端未初始化"}
             else:
                 self.client.u2.click(x, y)
             
@@ -1204,7 +1248,11 @@ class BasicMobileToolsLite:
             
             # 第3步：执行点击
             if self._is_ios():
-                ios_client.wda.click(x, y)
+                ios_client = self._get_ios_client()
+                if ios_client and hasattr(ios_client, 'wda'):
+                    ios_client.wda.click(x, y)
+                else:
+                    return {"success": False, "message": "❌ iOS 客户端未初始化"}
             else:
                 self.client.u2.click(x, y)
             
@@ -2225,7 +2273,11 @@ class BasicMobileToolsLite:
                 x1, y1, x2, y2 = swipe_map[direction]
             
             if self._is_ios():
-                ios_client.wda.swipe(x1, y1, x2, y2)
+                ios_client = self._get_ios_client()
+                if ios_client and hasattr(ios_client, 'wda'):
+                    ios_client.wda.swipe(x1, y1, x2, y2)
+                else:
+                    return {"success": False, "message": "❌ iOS 客户端未初始化"}
             else:
                 self.client.u2.swipe(x1, y1, x2, y2, duration=0.5)
             
@@ -3190,6 +3242,15 @@ class BasicMobileToolsLite:
             popup_detected: 可选，AI已识别到弹窗时为True，跳过弹窗检测
             popup_bounds: 可选，弹窗边界 (x1, y1, x2, y2)，如果AI已识别到弹窗区域可传入
         """
+        # iOS平台使用专门的实现
+        if self._is_ios():
+            ios_client = self._get_ios_client()
+            if ios_client:
+                return ios_client.close_popup()
+            else:
+                return {"success": False, "msg": "iOS客户端未初始化"}
+        
+        # Android平台的实现
         try:
             import re
             import xml.etree.ElementTree as ET

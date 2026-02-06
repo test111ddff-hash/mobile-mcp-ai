@@ -168,7 +168,7 @@ class IOSClientWDA:
     
     def _find_element(self, locator: str):
         """
-        尝试多种方式定位元素
+        尝试多种方式定位元素（增强版）
         
         Args:
             locator: 定位器字符串
@@ -176,13 +176,15 @@ class IOSClientWDA:
         Returns:
             元素对象或None
         """
-        # 尝试顺序：name > label > text > accessibility_id
+        # 尝试顺序：name > label > text > accessibility_id > className > 模糊匹配
         strategies = [
             lambda: self.wda(name=locator),
             lambda: self.wda(label=locator),
             lambda: self.wda(text=locator),
+            lambda: self.wda(value=locator),  # 输入框的值
             lambda: self.wda(nameContains=locator),
             lambda: self.wda(labelContains=locator),
+            lambda: self.wda(valueContains=locator),
         ]
         
         for strategy in strategies:
@@ -192,6 +194,15 @@ class IOSClientWDA:
                     return elem
             except:
                 continue
+        
+        # 尝试通过 className 定位（如果locator看起来像类名）
+        if 'XCUIElementType' in locator:
+            try:
+                elem = self.wda(className=locator)
+                if elem.exists:
+                    return elem
+            except:
+                pass
         
         return None
     
@@ -476,6 +487,278 @@ class IOSClientWDA:
         window = self.wda.window_size()
         return (window.width, window.height)
     
+    def take_screenshot_with_som(self) -> Dict:
+        """
+        Set-of-Mark 截图：给每个可点击元素标上数字（iOS版本）
+        
+        在截图上给每个可点击元素画框并标上数字编号。
+        AI 看图后直接说"点击 3 号"，然后调用 click_by_som(3) 即可。
+        
+        Returns:
+            包含标注截图和元素列表的字典
+        """
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+            import re
+            from datetime import datetime
+            import os
+            
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+            # 第1步：截图
+            temp_filename = f"temp_som_ios_{timestamp}.png"
+            screenshots_dir = os.path.join(os.getcwd(), 'screenshots')
+            os.makedirs(screenshots_dir, exist_ok=True)
+            temp_path = os.path.join(screenshots_dir, temp_filename)
+            
+            self.wda.screenshot(temp_path)
+            
+            img = Image.open(temp_path)
+            draw = ImageDraw.Draw(img, 'RGBA')
+            img_width, img_height = img.size
+            
+            # 尝试加载字体
+            try:
+                font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 16)
+                font_small = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 12)
+            except:
+                font = ImageFont.load_default()
+                font_small = font
+            
+            # 第2步：获取所有可点击元素
+            elements = []
+            
+            try:
+                source_xml = self.wda.source()
+                import xml.etree.ElementTree as ET
+                root = ET.fromstring(source_xml)
+                
+                # 可点击的元素类型
+                clickable_types = [
+                    'XCUIElementTypeButton',
+                    'XCUIElementTypeTextField',
+                    'XCUIElementTypeSecureTextField',
+                    'XCUIElementTypeCell',
+                    'XCUIElementTypeLink',
+                    'XCUIElementTypeSwitch',
+                    'XCUIElementTypeStaticText',
+                ]
+                
+                for elem in root.iter():
+                    elem_type = elem.get('type', '')
+                    name = elem.get('name', '')
+                    label = elem.get('label', '')
+                    value = elem.get('value', '')
+                    enabled = elem.get('enabled', 'true').lower() == 'true'
+                    visible = elem.get('visible', 'true').lower() == 'true'
+                    
+                    if not enabled or not visible:
+                        continue
+                    
+                    if elem_type not in clickable_types:
+                        continue
+                    
+                    try:
+                        x = int(float(elem.get('x', '0')))
+                        y = int(float(elem.get('y', '0')))
+                        width = int(float(elem.get('width', '0')))
+                        height = int(float(elem.get('height', '0')))
+                        
+                        # 过滤太小或太大的元素
+                        if width < 20 or height < 20:
+                            continue
+                        if width >= img_width * 0.98 and height >= img_height * 0.5:
+                            continue
+                        
+                        center_x = x + width // 2
+                        center_y = y + height // 2
+                        
+                        # 生成描述
+                        desc = name or label or value or elem_type.replace('XCUIElementType', '')
+                        if len(desc) > 20:
+                            desc = desc[:17] + "..."
+                        
+                        elements.append({
+                            'bounds': (x, y, x + width, y + height),
+                            'center': (center_x, center_y),
+                            'text': name or label or value,
+                            'desc': desc,
+                            'type': elem_type,
+                        })
+                    except (ValueError, TypeError):
+                        continue
+            
+            except Exception as e:
+                print(f"  ⚠️  获取元素列表失败: {e}", file=sys.stderr)
+            
+            # 第3步：在截图上标注
+            som_elements = []
+            
+            for idx, elem in enumerate(elements, start=1):
+                x1, y1, x2, y2 = elem['bounds']
+                center_x, center_y = elem['center']
+                
+                # 绘制边框（半透明蓝色）
+                draw.rectangle([x1, y1, x2, y2], outline=(0, 120, 255, 200), width=2)
+                
+                # 绘制编号标签（左上角）
+                label_text = str(idx)
+                
+                # 计算标签背景大小
+                try:
+                    bbox = draw.textbbox((0, 0), label_text, font=font)
+                    label_width = bbox[2] - bbox[0] + 8
+                    label_height = bbox[3] - bbox[1] + 4
+                except:
+                    label_width = 30
+                    label_height = 20
+                
+                # 绘制标签背景（红色）
+                draw.rectangle(
+                    [x1, y1 - label_height, x1 + label_width, y1],
+                    fill=(255, 0, 0, 220)
+                )
+                
+                # 绘制编号文字（白色）
+                draw.text((x1 + 4, y1 - label_height + 2), label_text, fill=(255, 255, 255), font=font)
+                
+                # 记录元素信息
+                som_elements.append({
+                    'id': idx,
+                    'desc': elem['desc'],
+                    'type': elem['type'].replace('XCUIElementType', ''),
+                    'center': elem['center'],
+                    'bounds': f"[{x1},{y1}][{x2},{y2}]"
+                })
+            
+            # 第4步：保存标注后的截图
+            filename = f"screenshot_ios_som_{timestamp}.jpg"
+            final_path = os.path.join(screenshots_dir, filename)
+            
+            # 转换为 RGB 并保存
+            if img.mode in ('RGBA', 'LA', 'P'):
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                if img.mode == 'P':
+                    img = img.convert('RGBA')
+                background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                img = background
+            elif img.mode != 'RGB':
+                img = img.convert("RGB")
+            
+            img.save(final_path, "JPEG", quality=85)
+            
+            # 删除临时文件
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            
+            print(f"  📸 SOM截图已保存: {final_path}", file=sys.stderr)
+            print(f"  🔢 标注了 {len(som_elements)} 个元素", file=sys.stderr)
+            
+            return {
+                "success": True,
+                "screenshot_path": final_path,
+                "elements": som_elements,
+                "count": len(som_elements),
+                "image_width": img_width,
+                "image_height": img_height
+            }
+            
+        except ImportError:
+            return {"success": False, "message": "❌ 需要安装 Pillow: pip install Pillow"}
+        except Exception as e:
+            return {"success": False, "message": f"❌ SOM截图失败: {e}"}
+    
+    def take_screenshot_with_grid(self, grid_size: int = 100) -> Dict:
+        """
+        截图并添加网格坐标标注（iOS版本）
+        
+        在截图上绘制网格线和坐标刻度，帮助快速定位元素位置。
+        
+        Args:
+            grid_size: 网格间距（像素），默认 100
+        
+        Returns:
+            包含标注截图路径的字典
+        """
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+            from datetime import datetime
+            import os
+            
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+            # 第1步：截图
+            temp_filename = f"temp_grid_ios_{timestamp}.png"
+            screenshots_dir = os.path.join(os.getcwd(), 'screenshots')
+            os.makedirs(screenshots_dir, exist_ok=True)
+            temp_path = os.path.join(screenshots_dir, temp_filename)
+            
+            self.wda.screenshot(temp_path)
+            
+            img = Image.open(temp_path)
+            draw = ImageDraw.Draw(img, 'RGBA')
+            
+            # 尝试加载字体
+            try:
+                font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 14)
+                font_small = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 11)
+            except:
+                font = ImageFont.load_default()
+                font_small = font
+            
+            img_width, img_height = img.size
+            
+            # 第2步：绘制网格线和坐标
+            grid_color = (255, 0, 0, 80)  # 半透明红色
+            text_color = (255, 0, 0, 200)  # 红色文字
+            
+            # 绘制垂直网格线
+            for x in range(0, img_width, grid_size):
+                draw.line([(x, 0), (x, img_height)], fill=grid_color, width=1)
+                # 顶部标注 X 坐标
+                draw.text((x + 2, 2), str(x), fill=text_color, font=font_small)
+            
+            # 绘制水平网格线
+            for y in range(0, img_height, grid_size):
+                draw.line([(0, y), (img_width, y)], fill=grid_color, width=1)
+                # 左侧标注 Y 坐标
+                draw.text((2, y + 2), str(y), fill=text_color, font=font_small)
+            
+            # 第3步：保存标注后的截图
+            filename = f"screenshot_ios_grid_{timestamp}.jpg"
+            final_path = os.path.join(screenshots_dir, filename)
+            
+            # 转换为 RGB 并保存
+            if img.mode in ('RGBA', 'LA', 'P'):
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                if img.mode == 'P':
+                    img = img.convert('RGBA')
+                background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                img = background
+            elif img.mode != 'RGB':
+                img = img.convert("RGB")
+            
+            img.save(final_path, "JPEG", quality=85)
+            
+            # 删除临时文件
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            
+            print(f"  📸 网格截图已保存: {final_path}", file=sys.stderr)
+            
+            return {
+                "success": True,
+                "screenshot_path": final_path,
+                "image_width": img_width,
+                "image_height": img_height,
+                "grid_size": grid_size
+            }
+            
+        except ImportError:
+            return {"success": False, "message": "❌ 需要安装 Pillow: pip install Pillow"}
+        except Exception as e:
+            return {"success": False, "message": f"❌ 网格截图失败: {e}"}
+    
     def list_elements(self) -> List[Dict]:
         """
         列出所有可交互元素（类似Android的mobile_list_elements）
@@ -488,54 +771,392 @@ class IOSClientWDA:
         elements = []
         
         try:
-            # 获取页面源码并解析
-            source = self.wda.source(format='json')
+            # 获取页面源码（XML格式）
+            source_xml = self.wda.source()
             
-            def extract_elements(node, depth=0):
-                """递归提取元素"""
-                if not isinstance(node, dict):
-                    return
-                
-                elem_type = node.get('type', '')
-                name = node.get('name', '')
-                label = node.get('label', '')
-                value = node.get('value', '')
-                rect = node.get('rect', {})
-                enabled = node.get('enabled', True)
-                
-                # 只收集可交互的元素
-                interactable_types = [
-                    'XCUIElementTypeButton',
-                    'XCUIElementTypeTextField',
-                    'XCUIElementTypeSecureTextField',
-                    'XCUIElementTypeTextView',
-                    'XCUIElementTypeSwitch',
-                    'XCUIElementTypeSlider',
-                    'XCUIElementTypeLink',
-                    'XCUIElementTypeCell',
-                    'XCUIElementTypeStaticText',
-                ]
-                
-                if elem_type in interactable_types and enabled:
-                    elements.append({
-                        'type': elem_type,
-                        'name': name,
-                        'label': label,
-                        'value': value,
-                        'bounds': f"[{rect.get('x', 0)},{rect.get('y', 0)}][{rect.get('x', 0) + rect.get('width', 0)},{rect.get('y', 0) + rect.get('height', 0)}]",
-                        'enabled': enabled,
-                    })
-                
-                # 递归处理子元素
-                for child in node.get('children', []):
-                    extract_elements(child, depth + 1)
+            # 解析XML
+            import xml.etree.ElementTree as ET
+            root = ET.fromstring(source_xml)
             
-            extract_elements(source)
+            # 只收集可交互的元素类型
+            interactable_types = [
+                'XCUIElementTypeButton',
+                'XCUIElementTypeTextField',
+                'XCUIElementTypeSecureTextField',
+                'XCUIElementTypeTextView',
+                'XCUIElementTypeSwitch',
+                'XCUIElementTypeSlider',
+                'XCUIElementTypeLink',
+                'XCUIElementTypeCell',
+                'XCUIElementTypeStaticText',
+                'XCUIElementTypeImage',
+                'XCUIElementTypeIcon',
+            ]
+            
+            # 递归遍历所有元素
+            for elem in root.iter():
+                elem_type = elem.get('type', '')
+                name = elem.get('name', '')
+                label = elem.get('label', '')
+                value = elem.get('value', '')
+                enabled = elem.get('enabled', 'true').lower() == 'true'
+                visible = elem.get('visible', 'true').lower() == 'true'
+                
+                # 获取坐标信息
+                x = elem.get('x', '0')
+                y = elem.get('y', '0')
+                width = elem.get('width', '0')
+                height = elem.get('height', '0')
+                
+                # 只收集可交互、可见且有文本的元素
+                if elem_type in interactable_types and enabled and visible:
+                    try:
+                        x_int = int(float(x))
+                        y_int = int(float(y))
+                        w_int = int(float(width))
+                        h_int = int(float(height))
+                        
+                        # 过滤太小的元素
+                        if w_int < 10 or h_int < 10:
+                            continue
+                        
+                        elements.append({
+                            'type': elem_type,
+                            'name': name,
+                            'label': label,
+                            'value': value,
+                            'bounds': f"[{x_int},{y_int}][{x_int + w_int},{y_int + h_int}]",
+                            'enabled': enabled,
+                            'visible': visible,
+                        })
+                    except (ValueError, TypeError):
+                        # 坐标解析失败，跳过
+                        continue
+            
+            print(f"  📋 找到 {len(elements)} 个可交互元素", file=sys.stderr)
             
         except Exception as e:
             print(f"  ⚠️  获取元素列表失败: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc()
         
         return elements
+    
+    def detect_popup(self) -> Dict:
+        """
+        检测iOS弹窗（类似Android版本）
+        
+        Returns:
+            {
+                'has_popup': bool,
+                'popup_type': str,  # 'alert', 'sheet', 'custom'
+                'bounds': str,  # 弹窗边界
+                'confidence': float  # 置信度
+            }
+        """
+        self._ensure_connected()
+        
+        try:
+            # 获取页面源码
+            source_xml = self.wda.source()
+            
+            import xml.etree.ElementTree as ET
+            root = ET.fromstring(source_xml)
+            
+            # 获取屏幕尺寸
+            size = self.wda.window_size()
+            screen_width, screen_height = size[0], size[1]
+            screen_area = screen_width * screen_height
+            
+            # iOS弹窗类型
+            popup_types = {
+                'XCUIElementTypeAlert': 'alert',
+                'XCUIElementTypeSheet': 'sheet',
+                'XCUIElementTypeDialog': 'dialog',
+            }
+            
+            popup_candidates = []
+            
+            # 遍历所有元素
+            for elem in root.iter():
+                elem_type = elem.get('type', '')
+                name = elem.get('name', '')
+                visible = elem.get('visible', 'true').lower() == 'true'
+                
+                if not visible:
+                    continue
+                
+                # 检查是否是系统弹窗类型
+                if elem_type in popup_types:
+                    x = int(float(elem.get('x', '0')))
+                    y = int(float(elem.get('y', '0')))
+                    width = int(float(elem.get('width', '0')))
+                    height = int(float(elem.get('height', '0')))
+                    
+                    popup_candidates.append({
+                        'type': popup_types[elem_type],
+                        'bounds': f"[{x},{y}][{x + width},{y + height}]",
+                        'confidence': 0.9,  # 系统弹窗置信度高
+                        'name': name,
+                    })
+                    continue
+                
+                # 检查自定义弹窗（大面积居中容器）
+                if elem_type in ['XCUIElementTypeOther', 'XCUIElementTypeWindow']:
+                    try:
+                        x = int(float(elem.get('x', '0')))
+                        y = int(float(elem.get('y', '0')))
+                        width = int(float(elem.get('width', '0')))
+                        height = int(float(elem.get('height', '0')))
+                        
+                        area = width * height
+                        area_ratio = area / screen_area if screen_area > 0 else 0
+                        
+                        # 自定义弹窗特征：
+                        # 1. 面积占屏幕20%-80%
+                        # 2. 不是全屏
+                        # 3. 相对居中
+                        if 0.2 < area_ratio < 0.8:
+                            center_x = x + width / 2
+                            center_y = y + height / 2
+                            screen_center_x = screen_width / 2
+                            screen_center_y = screen_height / 2
+                            
+                            # 计算偏离中心的距离
+                            offset_x = abs(center_x - screen_center_x) / screen_width
+                            offset_y = abs(center_y - screen_center_y) / screen_height
+                            
+                            # 如果相对居中（偏离不超过20%）
+                            if offset_x < 0.2 and offset_y < 0.2:
+                                confidence = 0.7 - (offset_x + offset_y)  # 越居中置信度越高
+                                
+                                popup_candidates.append({
+                                    'type': 'custom',
+                                    'bounds': f"[{x},{y}][{x + width},{y + height}]",
+                                    'confidence': confidence,
+                                    'name': name,
+                                })
+                    except (ValueError, TypeError):
+                        continue
+            
+            if not popup_candidates:
+                return {
+                    'has_popup': False,
+                    'popup_type': None,
+                    'bounds': None,
+                    'confidence': 0.0
+                }
+            
+            # 选择置信度最高的
+            best = max(popup_candidates, key=lambda x: x['confidence'])
+            
+            return {
+                'has_popup': True,
+                'popup_type': best['type'],
+                'bounds': best['bounds'],
+                'confidence': best['confidence'],
+                'name': best.get('name', '')
+            }
+            
+        except Exception as e:
+            print(f"  ⚠️  弹窗检测失败: {e}", file=sys.stderr)
+            return {
+                'has_popup': False,
+                'popup_type': None,
+                'bounds': None,
+                'confidence': 0.0,
+                'error': str(e)
+            }
+    
+    def close_popup(self) -> Dict:
+        """
+        智能关闭iOS弹窗（类似Android版本）
+        
+        策略：
+        1. 检测系统Alert/Sheet - 查找"取消"、"关闭"等按钮
+        2. 检测自定义弹窗 - 查找×、关闭按钮
+        3. 在弹窗边界内查找小尺寸可点击元素
+        
+        Returns:
+            操作结果
+        """
+        self._ensure_connected()
+        
+        try:
+            # 先检测弹窗
+            popup_info = self.detect_popup()
+            
+            if not popup_info['has_popup']:
+                return {
+                    'success': True,
+                    'popup': False,
+                    'message': '未检测到弹窗'
+                }
+            
+            print(f"  🔍 检测到弹窗: {popup_info['popup_type']}", file=sys.stderr)
+            
+            # 获取页面源码
+            source_xml = self.wda.source()
+            
+            import xml.etree.ElementTree as ET
+            import re
+            root = ET.fromstring(source_xml)
+            
+            # 获取屏幕尺寸
+            size = self.wda.window_size()
+            screen_width, screen_height = size[0], size[1]
+            
+            # 解析弹窗边界
+            popup_bounds = None
+            if popup_info['bounds']:
+                match = re.match(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', popup_info['bounds'])
+                if match:
+                    popup_bounds = tuple(map(int, match.groups()))
+            
+            # 关闭按钮的文本特征
+            close_texts = ['×', 'X', 'x', '关闭', '取消', 'Close', 'Cancel', 'Dismiss', '跳过', '知道了', 'OK', '确定']
+            
+            close_candidates = []
+            
+            # 遍历所有元素查找关闭按钮
+            for elem in root.iter():
+                elem_type = elem.get('type', '')
+                name = elem.get('name', '')
+                label = elem.get('label', '')
+                value = elem.get('value', '')
+                enabled = elem.get('enabled', 'true').lower() == 'true'
+                visible = elem.get('visible', 'true').lower() == 'true'
+                
+                if not enabled or not visible:
+                    continue
+                
+                try:
+                    x = int(float(elem.get('x', '0')))
+                    y = int(float(elem.get('y', '0')))
+                    width = int(float(elem.get('width', '0')))
+                    height = int(float(elem.get('height', '0')))
+                    
+                    if width < 10 or height < 10:
+                        continue
+                    
+                    center_x = x + width / 2
+                    center_y = y + height / 2
+                    
+                    # 检查是否在弹窗范围内
+                    in_popup = True
+                    if popup_bounds:
+                        px1, py1, px2, py2 = popup_bounds
+                        # 扩大搜索范围（关闭按钮可能在弹窗外侧）
+                        margin = 100
+                        in_popup = (px1 - margin <= center_x <= px2 + margin and 
+                                   py1 - margin <= center_y <= py2 + margin)
+                    
+                    if not in_popup:
+                        continue
+                    
+                    score = 0
+                    match_type = ""
+                    
+                    # 策略1: 精确匹配关闭文本
+                    if name in close_texts or label in close_texts or value in close_texts:
+                        score = 15.0
+                        match_type = f"text='{name or label or value}'"
+                    
+                    # 策略2: 包含关闭关键词
+                    elif any(kw in (name + label + value).lower() for kw in ['close', 'cancel', 'dismiss', '关闭', '取消']):
+                        score = 12.0
+                        match_type = "keyword"
+                    
+                    # 策略3: Button类型的小元素
+                    elif elem_type == 'XCUIElementTypeButton':
+                        if 20 <= width <= 100 and 20 <= height <= 100:
+                            score = 8.0
+                            match_type = "small_button"
+                            
+                            # 位置加分（右上角、左上角）
+                            rel_x = center_x / screen_width
+                            rel_y = center_y / screen_height
+                            
+                            if rel_y < 0.3:  # 上半部分
+                                if rel_x > 0.7:  # 右上角
+                                    score += 3.0
+                                elif rel_x < 0.3:  # 左上角
+                                    score += 2.0
+                    
+                    # 策略4: Image/Icon类型的小元素
+                    elif elem_type in ['XCUIElementTypeImage', 'XCUIElementTypeIcon']:
+                        if 15 <= width <= 80 and 15 <= height <= 80:
+                            score = 6.0
+                            match_type = "small_image"
+                            
+                            # 位置加分
+                            rel_x = center_x / screen_width
+                            rel_y = center_y / screen_height
+                            
+                            if rel_y < 0.3 and rel_x > 0.7:  # 右上角
+                                score += 4.0
+                    
+                    if score > 0:
+                        close_candidates.append({
+                            'x': int(center_x),
+                            'y': int(center_y),
+                            'width': width,
+                            'height': height,
+                            'score': score,
+                            'match_type': match_type,
+                            'name': name,
+                            'label': label,
+                        })
+                
+                except (ValueError, TypeError):
+                    continue
+            
+            if not close_candidates:
+                return {
+                    'success': False,
+                    'popup': True,
+                    'fallback': 'vision',
+                    'message': '未找到关闭按钮，建议使用视觉识别'
+                }
+            
+            # 选择得分最高的
+            best = max(close_candidates, key=lambda x: x['score'])
+            
+            print(f"  🎯 找到关闭按钮: {best['match_type']} at ({best['x']}, {best['y']})", file=sys.stderr)
+            
+            # 点击关闭按钮
+            self.wda.click(best['x'], best['y'])
+            
+            # 等待弹窗关闭（使用time.sleep而不是asyncio.sleep）
+            time.sleep(0.5)
+            
+            # 验证弹窗是否关闭
+            popup_info_after = self.detect_popup()
+            
+            if not popup_info_after['has_popup']:
+                print(f"  ✅ 弹窗已关闭", file=sys.stderr)
+                return {
+                    'success': True,
+                    'popup': True,
+                    'clicked': True,
+                    'method': best['match_type']
+                }
+            else:
+                print(f"  ⚠️  弹窗可能未关闭", file=sys.stderr)
+                return {
+                    'success': False,
+                    'popup': True,
+                    'clicked': True,
+                    'message': '点击后弹窗仍存在'
+                }
+            
+        except Exception as e:
+            print(f"  ❌ 关闭弹窗失败: {e}", file=sys.stderr)
+            return {
+                'success': False,
+                'popup': True,
+                'error': str(e)
+            }
 
 
 

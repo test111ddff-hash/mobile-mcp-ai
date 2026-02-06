@@ -1,34 +1,50 @@
 ---
 name: mobile-automation
 description: |
-  Mobile MCP + 飞书 MCP 双协作自动化测试专家。
+  移动端自动化测试专家（Android/iOS）。
   
   核心能力：
-  - 飞书多维表格用例管理（读取、执行、回写结果）
-  - Mobile MCP 移动端自动化（Android/iOS）
+  - 优先使用 XML 元素树定位（list_elements），避免截图浪费 Token
+  - 智能元素定位策略（text > id > percent > coords）
+  - 弹窗检测和处理
   - 智能重试与降级策略
-  - 每10条用例自动分批，打开新会话继续
+  - 支持飞书多维表格批量执行
   - Token 优化策略（减少 80% 的截图消耗）
 
 triggers:
   - 手机自动化
   - 移动端测试
   - App 测试
+  - Android 测试
+  - iOS 测试
   - mobile_mcp
   - 点击手机
   - 操作手机
+  - 启动应用
+  - 点击元素
+  - 输入文本
+  - 滑动屏幕
+  - 关闭弹窗
+  - 执行用例
   - 执行飞书用例
   - 飞书用例
   - 继续执行飞书用例
   - 批量执行
   - 多维表格
+  - list_elements
+  - click_by_text
+  - 元素定位
 ---
 
-# Mobile Automation + 飞书协作 Skill
+# Mobile Automation Skill
 
-你是一个移动端自动化专家，精通：
-1. **飞书 MCP** - 读取/写入多维表格用例
-2. **Mobile MCP** - 执行 Android/iOS 自动化操作
+你是一个移动端自动化专家，精通 Android 和 iOS 自动化测试。
+
+## 🎯 核心原则（所有移动端操作必须遵守）
+
+### 1. 元素定位策略（最重要！）
+
+**永远优先使用 XML 元素树定位，而不是截图！**
 
 ## 🔗 双MCP协作架构
 
@@ -51,37 +67,58 @@ triggers:
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## 🎯 核心原则
+## 🎯 核心原则（所有移动端操作必须遵守）
 
-### 1. Token 优化（最重要）
+### 1. 元素定位策略（最重要！）
 
-**永远优先使用 `list_elements`，而不是截图！**
+**永远优先使用 XML 元素树定位，而不是截图！**
 
-| 方式 | Token 消耗 | 使用场景 |
-|------|-----------|---------|
-| `list_elements` | ~500 | ✅ 确认页面状态、查找元素 |
-| `take_screenshot` | ~2000 | ❌ 只在需要视觉分析时使用 |
+#### 定位优先级
+
+```
+1️⃣ list_elements（最优先，Token 消耗 ~500）
+   ↓ 从 XML 树中查找元素的 text、resource-id、class 等属性
+   
+2️⃣ click_by_text（最稳定，跨设备兼容）
+   ↓ 找不到文本？
+   
+3️⃣ click_by_id（需要 resource-id）
+   ↓ 没有 id？
+   
+4️⃣ click_by_percent（百分比坐标，跨分辨率）
+   ↓ 复杂场景？
+   
+5️⃣ screenshot_with_som（SoM 标注，Token 消耗 ~2000）
+   ↓ 最后才用
+   
+6️⃣ click_at_coords（兜底，需要截图获取坐标）
+```
+
+#### Token 消耗对比
+
+| 方式 | Token 消耗 | 使用场景 | 优先级 |
+|------|-----------|---------|--------|
+| `list_elements` | ~500 | ✅ 确认页面状态、查找元素 | 🥇 最高 |
+| `click_by_text` | ~10 | ✅ 文本定位点击 | 🥇 最高 |
+| `click_by_id` | ~10 | ✅ ID 定位点击 | 🥈 高 |
+| `click_by_percent` | ~10 | ✅ 百分比定位 | 🥉 中 |
+| `screenshot_with_som` | ~2000 | ⚠️ XML 找不到时才用 | 🔻 低 |
+| `take_screenshot` | ~2000 | ❌ 只在需要视觉分析时使用 | 🔻 最低 |
+
+#### 标准操作流程
 
 ```
 ❌ 错误流程：截图 → 分析 → 点击 → 截图确认
 ✅ 正确流程：list_elements → 点击 → list_elements 确认
+
+示例：
+1. list_elements()  # 获取页面元素列表
+2. 分析 XML 树，找到目标元素的 text 或 id
+3. click_by_text("登录") 或 click_by_id("login_btn")
+4. list_elements()  # 确认页面跳转
 ```
 
-### 2. 工具选择优先级
-
-点击元素时，按以下优先级选择工具：
-
-```
-1️⃣ click_by_text（最稳定，跨设备兼容）
-   ↓ 找不到文本？
-2️⃣ click_by_id（需要 resource-id）
-   ↓ 没有 id？
-3️⃣ click_by_percent（百分比坐标，跨分辨率）
-   ↓ 复杂场景？
-4️⃣ click_at_coords（兜底，需要截图获取坐标）
-```
-
-### 3. 验证策略
+### 2. 验证策略
 
 **使用 verify 参数减少额外调用：**
 
@@ -96,27 +133,78 @@ list_elements()
 click_by_text("登录", verify="首页")  # 自动验证"首页"出现
 ```
 
----
+### 3. 弹窗处理
 
-## 📱 常见场景
-
-### 场景 1：启动 App 并处理弹窗
+**启动 App 后必须检测弹窗：**
 
 ```python
 # 标准流程
 1. launch_app("com.example.app")
 2. wait(2)  # 等待启动
-3. close_popup()  # 自动检测并关闭弹窗（无需先截图）
-4. list_elements()  # 确认主页面
+3. list_elements()  # 检查是否有弹窗特征
+4. 如果检测到弹窗 → close_popup()
+5. list_elements()  # 确认主页面
 ```
 
+---
+
+## 📱 通用场景（适用所有移动端测试）
+
+## 📱 通用场景（适用所有移动端测试）
+
+### 场景 1：启动 App 并处理弹窗
+
+```python
+# 标准流程（适用所有 App）
+1. launch_app("com.example.app")
+2. wait(2)  # 等待启动
+3. list_elements()  # 获取页面元素，检查是否有弹窗
+4. 如果检测到弹窗特征（关闭、跳过、×、取消等）：
+   close_popup()  # 自动检测并关闭弹窗
+5. list_elements()  # 确认主页面
+```
+
+**弹窗检测特征**：
+- 文本包含：关闭、跳过、×、取消、我知道了、暂不、稍后
+- resource-id 包含：close、dismiss、skip、cancel
+
 **注意**：`close_popup` 会自动检测是否有弹窗，如果没有会直接返回"无弹窗"，不会误操作。
+
+### 场景 2：元素定位和点击
+
+```python
+# 推荐流程（优先 XML 定位）
+1. list_elements()  # 获取页面所有元素
+2. 分析 XML 树，找到目标元素：
+   - 优先查找 text 属性（如 text="登录"）
+   - 其次查找 resource-id（如 resource-id="com.example:id/login_btn"）
+   - 最后查找 class 和位置信息
+3. 使用最合适的定位方式：
+   - 有文本 → click_by_text("登录")
+   - 有 ID → click_by_id("login_btn")
+   - 都没有 → click_by_percent(50, 80)  # 百分比坐标
+4. list_elements()  # 确认操作结果
+```
+
+**只有在 XML 树中找不到元素时，才使用视觉定位：**
+```python
+# 降级方案
+1. screenshot_with_som()  # SoM 标注截图
+2. 找到目标元素的编号
+3. click_by_som(编号)
+```
 
 ### 场景 2：登录流程
 
 ```python
-# 推荐流程
-1. list_elements()  # 获取输入框 ID
+# 推荐流程（优先 XML 定位）
+1. list_elements()  # 获取输入框信息
+   # 分析 XML 树，找到：
+   # - 用户名输入框的 resource-id（如 "username_input"）
+   # - 密码输入框的 resource-id（如 "password_input"）
+   # - 协议复选框的 text（如 "我已阅读并同意"）
+   # - 登录按钮的 text（如 "登录"）
+
 2. input_text_by_id("username_input", "test123")
 3. input_text_by_id("password_input", "password")
 4. hide_keyboard()  # ⭐ 必须！收起键盘，确保协议复选框可点击
@@ -126,22 +214,36 @@ click_by_text("登录", verify="首页")  # 自动验证"首页"出现
 
 **⚠️ 重要**：输入密码后键盘可能遮挡协议复选框，必须先调用 `hide_keyboard()` 收起键盘！
 
+**如果 XML 树中找不到元素**：
+```python
+# 降级方案
+1. screenshot_with_som()  # 获取 SoM 标注截图
+2. 找到协议复选框的编号（如编号 5）
+3. click_by_som(5)
+```
+
 ### 场景 3：滚动查找元素
 
 ```python
-# 元素可能在屏幕外时
+# 优先使用 XML 树查找
 max_scrolls = 5
 for i in range(max_scrolls):
-    elements = list_elements()
+    elements = list_elements()  # 获取当前屏幕的 XML 树
+    
+    # 在 XML 树中查找目标文本
     if "目标文本" in str(elements):
         click_by_text("目标文本")
         break
-    swipe("up")  # 向上滑动
+    
+    # 没找到，向上滑动
+    swipe("up")
     wait(0.5)
 else:
     # 滚动到底还没找到
     return "未找到目标元素"
 ```
+
+**注意**：每次滚动后都用 `list_elements()` 检查，不要用截图。
 
 ### 场景 4：处理多个相同文案
 
@@ -163,10 +265,11 @@ click_by_text("确定", position="bottom")
 # 1. 开始录制
 clear_operation_history()
 
-# 2. 执行测试步骤（正常操作）
+# 2. 执行测试步骤（正常操作，优先使用 XML 定位）
 launch_app("com.example.app")
-click_by_text("登录")
-input_text_by_id("username", "test")
+list_elements()  # 获取页面元素
+click_by_text("登录")  # 优先使用 text 定位
+input_text_by_id("username", "test")  # 使用 id 定位
 click_by_text("提交")
 
 # 3. 生成脚本
@@ -184,23 +287,44 @@ generate_test_script(
 
 ---
 
-## 🚫 弹窗处理策略
+## 🚫 弹窗处理策略（通用）
+
+## 🚫 弹窗处理策略（通用）
+
+### 弹窗检测方法
+
+**优先使用 XML 树检测弹窗：**
+
+```python
+# 1. 获取页面元素
+elements = list_elements()
+
+# 2. 检测弹窗特征
+弹窗特征 = [
+    "关闭", "跳过", "×", "取消", "我知道了", "暂不", "稍后",
+    "close", "dismiss", "skip", "cancel"
+]
+
+# 3. 如果检测到弹窗特征，调用 close_popup
+if any(特征 in str(elements) for 特征 in 弹窗特征):
+    close_popup()
+```
 
 ### 工具选择
 
-| 场景 | 推荐工具 |
-|------|---------|
-| 通用弹窗（权限、广告） | `close_popup` |
-| 广告弹窗 | `close_ad` |
-| 已知模板的 X 按钮 | `template_close` |
-| 需要先确认位置 | `find_close_button` |
+| 场景 | 推荐工具 | 说明 |
+|------|---------|------|
+| 通用弹窗（权限、广告） | `close_popup` | 自动从 XML 树查找关闭按钮 |
+| 广告弹窗 | `close_ad` | 优先级：XML 树 → 截图 AI → 模板匹配 |
+| 已知模板的 X 按钮 | `template_close` | 图像模板匹配 |
+| 需要先确认位置 | `find_close_button` | 返回推荐的点击方式 |
 
 ### close_popup 工作原理
 
-1. **控件树查找**：找 ×、关闭、跳过、取消 等文本
+1. **XML 树查找**（优先）：找 ×、关闭、跳过、取消 等文本
 2. **resource-id 匹配**：找包含 close/dismiss/skip 的 id
 3. **小元素检测**：找角落的小型 clickable 元素
-4. **视觉兜底**：返回 SoM 截图让 AI 识别
+4. **视觉兜底**（最后）：返回 SoM 截图让 AI 识别
 
 ### 处理顽固弹窗
 
@@ -221,17 +345,26 @@ template_match_and_click(template_name="checkbox_checked", category="checkbox")
 
 ---
 
-## ⚠️ 错误处理
+## ⚠️ 错误处理（通用）
 
 ### 元素找不到
 
 ```python
-# 可能原因及解决
-1. 文本不完全匹配 → 用 list_elements 确认完整文本
-2. 元素在屏幕外 → swipe 滚动后重试
-3. 页面未加载完 → wait(1-2秒) 后重试
-4. 被弹窗遮挡 → close_popup 后重试
+# 可能原因及解决（按优先级）
+1. 先用 list_elements 确认元素是否在 XML 树中
+   → 如果在，检查文本是否完全匹配
+   → 如果不在，可能在屏幕外或未加载
+
+2. 元素在屏幕外 → swipe 滚动后重试 list_elements
+
+3. 页面未加载完 → wait(1-2秒) 后重试 list_elements
+
+4. 被弹窗遮挡 → 先 list_elements 检测弹窗 → close_popup 后重试
+
+5. XML 树中确实没有 → 降级使用 screenshot_with_som
 ```
+
+**重要**：不要一上来就截图，先用 `list_elements` 检查 XML 树！
 
 ### 设备连接问题
 
@@ -268,74 +401,71 @@ check_connection()
 
 ---
 
-## 📝 最佳实践检查清单
+## 📝 最佳实践检查清单（所有移动端操作必须遵守）
 
 执行操作前，确认：
 
-- [ ] 用 `list_elements` 而不是截图确认页面
-- [ ] 优先使用 `click_by_text`，其次 `click_by_id`
-- [ ] 使用 `verify` 参数减少确认调用
-- [ ] 启动 App 后调用 `close_popup` 处理弹窗
-- [ ] Toast 验证前先 `start_toast_watch`
+- [ ] **优先使用 `list_elements` 获取 XML 树**，而不是截图
+- [ ] **从 XML 树中查找元素的 text、resource-id、class 属性**
+- [ ] **优先使用 `click_by_text`**，其次 `click_by_id`，最后才考虑坐标
+- [ ] **使用 `verify` 参数减少确认调用**
+- [ ] **启动 App 后先 `list_elements` 检测弹窗**，再决定是否调用 `close_popup`
+- [ ] **只有在 XML 树中找不到元素时，才使用 `screenshot_with_som`**
+- [ ] Toast 验证前先 `start_toast_watch`（仅 Android）
 - [ ] 录制脚本前先 `clear_operation_history`
 
 ---
 
-## 🔧 工具速查
+## 🔧 工具速查（按使用频率排序）
 
-### 页面分析
-- `list_elements` - 📋 列出元素（首选）
-- `take_screenshot` - 📸 截图（token 高）
-- `screenshot_with_som` - 📸 SoM 标注截图
-- `get_screen_size` - 📐 屏幕尺寸
+## 🔧 工具速查（按使用频率排序）
 
-### 点击操作
-- `click_by_text` - 👆 文本点击（推荐）
-- `click_by_id` - 👆 ID 点击
-- `click_by_percent` - 👆 百分比点击
+### 🥇 最常用（优先使用）
+- `list_elements` - 📋 **获取 XML 元素树**（Token ~500，最优先）
+- `click_by_text` - 👆 **文本点击**（从 XML 树定位）
+- `click_by_id` - 👆 **ID 点击**（从 XML 树定位）
+- `wait` - ⏰ 等待
+- `swipe` - 👆 滑动（up/down/left/right）
+
+### 🥈 常用
+- `input_text_by_id` - ⌨️ ID 输入
+- `hide_keyboard` - ⌨️ 收起键盘（⭐ 登录场景必备）
+- `close_popup` - 🚫 智能关闭弹窗（基于 XML 树）
+- `launch_app` - 🚀 启动应用
+- `terminate_app` - ⏹️ 终止应用
+- `press_key` - ⌨️ 按键（home/back/enter）
+
+### 🥉 备用（XML 找不到时才用）
+- `screenshot_with_som` - 📸 SoM 标注截图（Token ~2000）
 - `click_by_som` - 👆 SoM 编号点击
-- `click_at_coords` - 👆 坐标点击（兜底）
+- `click_by_percent` - 👆 百分比点击
+- `take_screenshot` - 📸 普通截图（Token ~2000）
 
-### 长按操作
+### 其他工具
+- `click_at_coords` - 👆 坐标点击（兜底）
+- `input_at_coords` - ⌨️ 坐标输入
 - `long_press_by_text` - 👆 文本长按
 - `long_press_by_id` - 👆 ID 长按
 - `long_press_by_percent` - 👆 百分比长按
 - `long_press_at_coords` - 👆 坐标长按
-
-### 输入操作
-- `input_text_by_id` - ⌨️ ID 输入
-- `input_at_coords` - ⌨️ 坐标输入
-
-### 导航操作
-- `swipe` - 👆 滑动（up/down/left/right）
-- `press_key` - ⌨️ 按键（home/back/enter）
-- `hide_keyboard` - ⌨️ 收起键盘（⭐ 登录场景必备）
-- `wait` - ⏰ 等待
-
-### 应用管理
-- `launch_app` - 🚀 启动应用
-- `terminate_app` - ⏹️ 终止应用
+- `get_screen_size` - 📐 屏幕尺寸
+- `screenshot_with_grid` - 📸 网格坐标截图
 - `list_apps` - 📦 列出应用
-
-### 弹窗处理
-- `close_popup` - 🚫 智能关闭弹窗
 - `close_ad` - 🚫 关闭广告
 - `find_close_button` - 🔍 查找关闭按钮
 - `template_close` - 🎯 模板匹配关闭
 - `template_match_and_click` - 🎯 通用模板匹配并点击
-
-### 验证断言
 - `assert_text` - ✅ 断言文本存在
-- `assert_toast` - ✅ 断言 Toast 内容
-
-### 脚本生成
+- `assert_toast` - ✅ 断言 Toast 内容（仅 Android）
+- `start_toast_watch` - 🔔 开始监听 Toast（仅 Android）
+- `get_toast` - 🍞 获取 Toast 消息（仅 Android）
 - `clear_operation_history` - 🗑️ 清空历史
 - `get_operation_history` - 📜 获取历史
 - `generate_test_script` - 📝 生成 pytest 脚本
 
 ---
 
-## 📋 批量执行 YAML 测试用例
+## 📋 飞书多维表格批量执行（可选功能）
 
 当用户说"执行 xxx.yaml"时，按以下规则执行：
 
