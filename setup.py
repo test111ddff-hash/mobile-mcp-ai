@@ -42,11 +42,10 @@ setup(
         'mobile_mcp',
         'mobile_mcp.core',
         'mobile_mcp.core.utils',
-        'mobile_mcp.mcp_tools',
         'mobile_mcp.utils',
     ],
     # 将 mobile_mcp 映射到当前目录
-    package_dir={'mobile_mcp': '.'},
+    package_dir={'mobile_mcp': 'mobile_mcp'},
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
@@ -125,7 +124,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'mobile-mcp=mobile_mcp.mcp_tools.mcp_server:main',
+            'mobile-mcp=mcp_tools.mcp_server:main',
         ],
     },
     keywords=[
