@@ -41,6 +41,13 @@ ENV/
 # 个人MCP配置目录（包含本地路径等敏感信息）
 mobile-mcp/
 
+# 工作区配置目录（个人配置）
+.wdm/
+.kiro/
+
+# 临时缓存目录
+e0287bc0c67a30c8/
+
 # 测试结果和截图（用户本地生成的文件）
 screenshots/*.png
 screenshots/*.jpg
