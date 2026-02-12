@@ -1,0 +1,26 @@
+{
+  "mcpServers": {
+    "mobile-android": {
+      "command": "python",
+      "args": [
+        "/absolute/path/to/mobile_mcp/mcp_tools/mcp_server.py"
+      ],
+      "env": {
+        "MOBILE_PLATFORM": "android"
+      },
+      "disabled": false,
+      "autoApprove": []
+    },
+    "mobile-ios": {
+      "command": "python",
+      "args": [
+        "/absolute/path/to/mobile_mcp/mcp_tools/mcp_server.py"
+      ],
+      "env": {
+        "MOBILE_PLATFORM": "ios"
+      },
+      "disabled": false,
+      "autoApprove": []
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "mcpServers": {
+    "mobile-android": {
+      "command": "/usr/local/bin/python3",
+      "args": [
+        "/Users/mac/Desktop/mobile_mcp/mcp_tools/mcp_server.py"
+      ],
+      "env": {
+        "MOBILE_PLATFORM": "android"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "mobile_list_elements",
+        "mobile_get_screen_size",
+        "mobile_check_connection",
+        "mobile_list_devices",
+        "mobile_get_operation_history",
+        "mobile_clear_operation_history"
+      ]
+    },
+    "mobile-ios": {
+      "command": "/usr/local/bin/python3",
+      "args": [
+        "/Users/mac/Desktop/mobile_mcp/mcp_tools/mcp_server.py"
+      ],
+      "env": {
+        "MOBILE_PLATFORM": "ios"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "mobile_list_elements",
+        "mobile_get_screen_size",
+        "mobile_check_connection",
+        "mobile_list_devices",
+        "mobile_get_operation_history",
+        "mobile_clear_operation_history"
+      ]
+    }
+  }
+}

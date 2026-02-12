@@ -39,12 +39,8 @@ alwaysApply: true
 - ❌ 点击按钮 + 验证结果（有依赖，必须串行）
 
 ### 1. Token 优化（最重要）
-- 永远优先使用 `list_elements`，而不是截图确认页面
-- list_elements 消耗 ~500 tokens，截图消耗 ~2000 tokens
-- 正确流程：list_elements → 点击 → list_elements 确认
-
-**原则**：
-1. 合理使用控件树和截图进行页面和弹窗识别，仅在启动应用后、异常情况、明确弹窗场景时检测弹窗
+- 参考 Skills 文档中的详细指导
+- 【强制】必须遵循 Skills 中的定位优先级策略
 2. **【强制】MCP工具串行调用规则**：
    - ❌ **禁止**：一次性并发调用多个MCP工具（除非明确需要并行获取独立信息）
    - ✅ **必须**：每次只调用一个MCP工具，等待结果返回后，根据结果再决定下一步
@@ -54,17 +50,16 @@ alwaysApply: true
 3. 用例执行时间较长，继续执行，直到用例全部执行完，无须暂停等待人工确认
 
 ### 2. 工具选择优先级
-点击元素时按优先级选择：
+- 参考 Skills 文档中的详细工具速查表
+- 【强制】必须遵循 Skills 中的定位优先级：list_elements > click_by_text > click_by_id > click_by_percent > screenshot_with_som
 1. click_by_text（最稳定，跨设备兼容）
 2. click_by_id（需要 resource-id）
 3. click_by_percent（百分比坐标，跨分辨率）
 4. click_at_coords（兜底，需要截图获取坐标）
 
 ### 3. 验证策略
-使用 verify 参数减少额外调用：
-```
-click_by_text("登录", verify="首页")  # 自动验证"首页"出现
-```
+- 参考 Skills 文档中的验证策略说明
+- 【强制】必须使用 verify 参数减少额外调用
 
 ## 常见场景
 

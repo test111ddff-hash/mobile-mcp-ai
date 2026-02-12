@@ -98,3 +98,7 @@ TESTING_GUIDE.md
 # docs/PACKAGE_PUBLISH.md ✅ 提交（发布指南）
 # docs/PUBLISH_AND_USAGE.md ✅ 提交（使用指南）
 
+
+# WDM
+.wdm/
+.windsurfrules
